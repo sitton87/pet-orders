@@ -2,12 +2,30 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Database, Package, ShoppingCart, Calendar } from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
+
+  // Auto-logout functionality
+  useEffect(() => {
+    if (!session) return;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // המסך ננעל או הדף נסגר
+        signOut({ callbackUrl: "/" });
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [session]);
 
   if (!session) {
     return null; // לא מציג navbar למשתמשים לא מחוברים
@@ -89,7 +107,12 @@ export default function Navbar() {
                   {session.user?.email}
                 </div>
                 <button
-                  onClick={() => signOut()}
+                  onClick={() =>
+                    signOut({
+                      callbackUrl: "/",
+                      redirect: true,
+                    })
+                  }
                   className="block w-full text-right px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors"
                 >
                   התנתק
