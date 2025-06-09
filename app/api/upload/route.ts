@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { v2 as cloudinary } from "cloudinary";
 import { v4 as uuidv4 } from "uuid";
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,32 +73,36 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "סוג קובץ לא נתמך" }, { status: 400 });
     }
 
-    // Generate unique filename
+    // Generate unique filename and public_id for Cloudinary
     const fileId = uuidv4();
     const fileExtension = file.name.split(".").pop() || "";
-    const fileName = `${fileId}.${fileExtension}`;
+    const publicId = `r4pet/${entityType}s/${entityId}/${fileId}`;
 
-    // Create upload directory if it doesn't exist
-    const uploadDir = join(
-      process.cwd(),
-      "public",
-      "uploads",
-      entityType + "s",
-      entityId
-    );
-    await mkdir(uploadDir, { recursive: true });
-
-    // Save file to disk
-    const filePath = join(uploadDir, fileName);
+    // Convert file to buffer
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
-    await writeFile(filePath, buffer);
 
-    // Create file URL
-    const fileUrl = `/uploads/${entityType}s/${entityId}/${fileName}`;
+    // Upload to Cloudinary
+    const uploadResult = await new Promise((resolve, reject) => {
+      cloudinary.uploader
+        .upload_stream(
+          {
+            public_id: publicId,
+            resource_type: "auto", // Auto-detect file type
+            folder: `r4pet/${entityType}s/${entityId}`,
+            use_filename: true,
+            unique_filename: false,
+          },
+          (error, result) => {
+            if (error) reject(error);
+            else resolve(result);
+          }
+        )
+        .end(buffer);
+    });
 
-    // Save file info to database and get response data
-    let responseData;
+    const cloudinaryResult = uploadResult as any;
+    const fileUrl = cloudinaryResult.secure_url;
 
     // Get or create a user for uploads
     let userId: string;
@@ -113,6 +123,9 @@ export async function POST(request: NextRequest) {
       userId = "placeholder-user"; // fallback
     }
 
+    // Save file info to database and get response data
+    let responseData;
+
     if (entityType === "supplier") {
       const fileRecord = await prisma.supplierFile.create({
         data: {
@@ -120,7 +133,7 @@ export async function POST(request: NextRequest) {
           fileName: file.name,
           fileSize: file.size,
           fileType: file.type,
-          filePath: fileUrl,
+          filePath: fileUrl, // Cloudinary URL
           supplierId: entityId,
           uploadedBy: userId,
         },
@@ -133,6 +146,7 @@ export async function POST(request: NextRequest) {
         type: fileRecord.fileType,
         url: fileRecord.filePath,
         uploadedAt: fileRecord.uploadedAt,
+        cloudinaryId: publicId, // שמירת ה-ID לצורך מחיקה עתידית
       };
     } else {
       const fileRecord = await prisma.orderFile.create({
@@ -140,7 +154,7 @@ export async function POST(request: NextRequest) {
           id: fileId,
           fileName: file.name,
           fileSize: file.size,
-          filePath: fileUrl,
+          filePath: fileUrl, // Cloudinary URL
           orderId: entityId,
           uploadedBy: userId,
         },
@@ -153,9 +167,11 @@ export async function POST(request: NextRequest) {
         type: file.type, // אין fileType ב-OrderFile אז נשתמש ב-file.type
         url: fileRecord.filePath,
         uploadedAt: fileRecord.uploadedAt,
+        cloudinaryId: publicId, // שמירת ה-ID לצורך מחיקה עתידית
       };
     }
 
+    console.log("File uploaded successfully to Cloudinary:", publicId);
     return NextResponse.json(responseData);
   } catch (error) {
     console.error("Upload error:", error);
