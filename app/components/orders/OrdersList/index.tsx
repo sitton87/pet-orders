@@ -11,12 +11,14 @@ interface OrdersListProps {
   orders: Order[];
   suppliers: Supplier[];
   onUpdateOrders: (orders: Order[]) => void;
+  onViewGantt?: (orderId: string) => void;
 }
 
 export default function OrdersList({
   orders: initialOrders,
   suppliers,
   onUpdateOrders,
+  onViewGantt,
 }: OrdersListProps) {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [loading, setLoading] = useState(false);
@@ -148,9 +150,14 @@ export default function OrdersList({
   };
 
   const handleViewGantt = (orderId: string) => {
-    // לעתיד - מעבר לתצוגת גאנט של הזמנה ספציפית
-    console.log("View Gantt for order:", orderId);
-    alert("תצוגת גאנט תתווסף בהמשך");
+    // אם יש פונקציה מהחוץ - השתמש בה
+    if (onViewGantt) {
+      onViewGantt(orderId);
+    } else {
+      // fallback ישן
+      console.log("View Gantt for order:", orderId);
+      alert("תצוגת גאנט תתווסף בהמשך");
+    }
   };
 
   // סינון הזמנות
