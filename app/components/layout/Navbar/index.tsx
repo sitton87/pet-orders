@@ -2,33 +2,69 @@
 
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Database, Package, ShoppingCart, Calendar } from "lucide-react";
 
 export default function Navbar() {
   const { data: session } = useSession();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
-
-  // Auto-logout functionality
+  const lastActivityRef = useRef(Date.now());
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Smart auto-logout functionality
   useEffect(() => {
     if (!session) return;
 
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        // המסך ננעל או הדף נסגר
+    const INACTIVITY_TIME = 30 * 60 * 1000; // 30 דקות במילישניות
+    const CHECK_INTERVAL = 60 * 1000; // בדוק כל דקה
+
+    // פונקציה לעדכון זמן פעילות אחרון
+    const updateLastActivity = () => {
+      lastActivityRef.current = Date.now();
+    };
+
+    // פונקציה לבדיקת חוסר פעילות
+    const checkInactivity = () => {
+      const now = Date.now();
+      const timeSinceLastActivity = now - lastActivityRef.current;
+
+      if (timeSinceLastActivity >= INACTIVITY_TIME) {
         signOut({ callbackUrl: "/" });
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibilityChange);
+    // אירועים שמעדכנים פעילות
+    const activityEvents = [
+      "mousedown",
+      "mousemove",
+      "keypress",
+      "scroll",
+      "touchstart",
+      "click",
+    ];
 
+    // הוסף listeners לכל האירועים
+    activityEvents.forEach((event) => {
+      document.addEventListener(event, updateLastActivity, true);
+    });
+
+    // התחל בדיקה מחזורית
+    checkIntervalRef.current = setInterval(checkInactivity, CHECK_INTERVAL);
+
+    // Cleanup
     return () => {
-      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      activityEvents.forEach((event) => {
+        document.removeEventListener(event, updateLastActivity, true);
+      });
+
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+        checkIntervalRef.current = null;
+      }
     };
   }, [session]);
 
   if (!session) {
-    return null; // לא מציג navbar למשתמשים לא מחוברים
+    return null;
   }
 
   const navigationItems = [
