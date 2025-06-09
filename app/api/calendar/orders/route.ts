@@ -3,7 +3,155 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    console.log("📅 CALENDAR API - Fetching orders with stages");
+    const { searchParams } = new URL(request.url);
+    const orderId = searchParams.get("orderId");
+
+    // אם יש orderId - החזר רק את השלבים של ההזמנה הזו
+    if (orderId) {
+      console.log(`📅 CALENDAR API - Fetching single order: ${orderId}`);
+
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: {
+          supplier: {
+            select: {
+              name: true,
+              currency: true,
+            },
+          },
+          phases: {
+            select: {
+              id: true,
+              phaseName: true,
+              startDate: true,
+              endDate: true,
+            },
+          },
+        },
+      });
+
+      if (!order) {
+        return NextResponse.json({ error: "הזמנה לא נמצאה" }, { status: 404 });
+      }
+
+      // Generate stages for single order
+      let stages = [];
+
+      if (order.phases && order.phases.length > 0) {
+        // Use real phases from database
+        stages = order.phases.map((phase: any) => ({
+          id: phase.id,
+          phaseName: phase.phaseName || "שלב לא ידוע",
+          category: getCategoryFromName(phase.phaseName || ""),
+          status: getStatusFromDates(phase.startDate, phase.endDate),
+          startDate: phase.startDate || order.createdAt,
+          endDate: phase.endDate || order.etaFinal,
+        }));
+      } else {
+        // Generate demo stages based on order dates
+        const orderDate = new Date(order.createdAt);
+        const etaDate = new Date(order.etaFinal);
+
+        stages = [
+          {
+            id: `${order.id}-stage-1`,
+            phaseName: "הכנת הזמנה",
+            category: "אישורים",
+            status: "הושלם",
+            startDate: orderDate.toISOString(),
+            endDate: new Date(
+              orderDate.getTime() + 3 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-2`,
+            phaseName: "שליחת הזמנה לספק",
+            category: "אישורים",
+            status: "הושלם",
+            startDate: new Date(
+              orderDate.getTime() + 3 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: new Date(
+              orderDate.getTime() + 7 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-3`,
+            phaseName: "תשלום מקדמה",
+            category: "כספים",
+            status: "בתהליך",
+            startDate: new Date(
+              orderDate.getTime() + 5 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: new Date(
+              orderDate.getTime() + 10 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-4`,
+            phaseName: "ייצור",
+            category: "ייצור",
+            status: "ממתין",
+            startDate: new Date(
+              orderDate.getTime() + 21 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: new Date(
+              etaDate.getTime() - 30 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-5`,
+            phaseName: "שילוח",
+            category: "שילוח",
+            status: "ממתין",
+            startDate: new Date(
+              etaDate.getTime() - 21 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: new Date(
+              etaDate.getTime() - 7 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-6`,
+            phaseName: "תשלום סופי",
+            category: "כספים",
+            status: "ממתין",
+            startDate: new Date(
+              etaDate.getTime() - 14 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: new Date(
+              etaDate.getTime() - 7 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+          },
+          {
+            id: `${order.id}-stage-7`,
+            phaseName: "כניסה לנמל ושחרור",
+            category: "נמל",
+            status: "ממתין",
+            startDate: new Date(
+              etaDate.getTime() - 3 * 24 * 60 * 60 * 1000
+            ).toISOString(),
+            endDate: etaDate.toISOString(),
+          },
+        ];
+      }
+
+      console.log(
+        `📅 CALENDAR API - Returning ${stages.length} phases for order ${order.orderNumber}`
+      );
+
+      return NextResponse.json({
+        phases: stages,
+        orderInfo: {
+          id: order.id,
+          orderNumber: order.orderNumber,
+          supplierName: order.supplier?.name || "ספק לא ידוע",
+        },
+      });
+    }
+
+    // אם אין orderId - החזר את כל ההזמנות (הקוד הקיים)
+    console.log("📅 CALENDAR API - Fetching all orders with stages");
 
     // Fetch orders with their stages
     const orders = await prisma.order.findMany({
@@ -196,23 +344,19 @@ function getCategoryFromName(name: string): string {
     lowerName.includes("מקדמה") ||
     lowerName.includes("סופי")
   ) {
-    return "payment";
+    return "כספים";
   }
   if (lowerName.includes("ייצור") || lowerName.includes("הכנת")) {
-    return "production";
+    return "ייצור";
   }
-  if (
-    lowerName.includes("שילוח") ||
-    lowerName.includes("נמל") ||
-    lowerName.includes("שחרור")
-  ) {
-    return "shipping";
+  if (lowerName.includes("שילוח")) {
+    return "שילוח";
   }
-  if (lowerName.includes("שילוח") || lowerName.includes("כניסה לנמל")) {
-    return "delivery";
+  if (lowerName.includes("נמל") || lowerName.includes("שחרור")) {
+    return "נמל";
   }
 
-  return "approval"; // default
+  return "אישורים"; // default
 }
 
 // Helper function to determine status from dates
@@ -222,9 +366,9 @@ function getStatusFromDates(
 ): string {
   const now = new Date();
 
-  if (!startDate) return "pending";
-  if (endDate && endDate < now) return "completed";
-  if (startDate <= now) return "in-progress";
+  if (!startDate) return "ממתין";
+  if (endDate && endDate < now) return "הושלם";
+  if (startDate <= now) return "בתהליך";
 
-  return "pending";
+  return "ממתין";
 }
