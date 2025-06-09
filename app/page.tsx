@@ -70,12 +70,14 @@ export default function HomePage() {
             </div>
 
             <div
-              onClick={() => router.push("/gantt")}
+              onClick={() => router.push("/calendar")}
               className="bg-white p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow cursor-pointer border-2 border-transparent hover:border-blue-500"
             >
-              <div className="text-3xl mb-4">📊</div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">גאנט</h3>
-              <p className="text-gray-600">תצוגת לוח זמנים</p>
+              <div className="text-3xl mb-4">📅</div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                לוח שנה
+              </h3>
+              <p className="text-gray-600">תצוגת לוח שנה אינטראקטיבי</p>
             </div>
 
             <div
