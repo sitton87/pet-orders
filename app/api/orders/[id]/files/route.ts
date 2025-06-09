@@ -6,10 +6,10 @@ import { join } from "path";
 // GET - קבלת כל הקבצים של הזמנה
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    const { id: orderId } = await params;
 
     const files = await prisma.orderFile.findMany({
       where: {
@@ -39,10 +39,10 @@ export async function GET(
 // DELETE - מחיקת קובץ
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const orderId = params.id;
+    const { id: orderId } = await params;
     const { fileId } = await request.json();
 
     if (!fileId) {
