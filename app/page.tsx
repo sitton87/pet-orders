@@ -18,10 +18,6 @@ export default function HomePage() {
     }
   }, [session, status, router]);
 
-  // הוסף בתחילת הקומפוננט:
-  if (process.env.NODE_ENV === "development") {
-    return <Dashboard />; // עקיפת authentication בפיתוח
-  }
   if (status === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center">
