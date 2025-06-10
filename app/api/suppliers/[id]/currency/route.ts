@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { currency } = await request.json();
+    const { id } = await params; // 🔧 await the params Promise
 
     if (!currency) {
       return NextResponse.json({ error: "מטבע נדרש" }, { status: 400 });
@@ -14,7 +15,7 @@ export async function PUT(
 
     // בדיקה שהספק קיים
     const existingSupplier = await prisma.supplier.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingSupplier) {
@@ -23,14 +24,14 @@ export async function PUT(
 
     // עדכון המטבע
     const updatedSupplier = await prisma.supplier.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         currency,
         updatedAt: new Date(),
       },
     });
 
-    console.log(`Supplier ${params.id} currency updated to: ${currency}`);
+    console.log(`Supplier ${id} currency updated to: ${currency}`);
 
     return NextResponse.json({
       message: "מטבע עודכן בהצלחה",

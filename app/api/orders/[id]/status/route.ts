@@ -3,10 +3,11 @@ import { prisma } from "@/lib/prisma";
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { status } = await request.json();
+    const { id } = await params; // 🔧 await the params Promise
 
     if (!status) {
       return NextResponse.json({ error: "סטטוס נדרש" }, { status: 400 });
@@ -14,7 +15,7 @@ export async function PUT(
 
     // בדיקה שההזמנה קיימת
     const existingOrder = await prisma.order.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     if (!existingOrder) {
@@ -23,14 +24,14 @@ export async function PUT(
 
     // עדכון הסטטוס
     const updatedOrder = await prisma.order.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         status,
         updatedAt: new Date(),
       },
     });
 
-    console.log(`Order ${params.id} status updated to: ${status}`);
+    console.log(`Order ${id} status updated to: ${status}`);
 
     return NextResponse.json({
       message: "סטטוס עודכן בהצלחה",
