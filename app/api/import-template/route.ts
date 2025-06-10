@@ -111,7 +111,8 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "suppliers_template.xlsx";
+      const dateStamp = new Date().toISOString().split("T")[0];
+      filename = `suppliers_template_${dateStamp}.xlsx`;
     } else if (type === "orders") {
       const data = [
         // שורה 1: כותרות עמודות
@@ -162,23 +163,7 @@ export async function GET(request: NextRequest) {
           "אופציונלי",
         ],
 
-        // שורה 4: כותרות עמודות (שוב)
-        [
-          "מספר הזמנה",
-          "שם ספק",
-          "תאריך ETA",
-          "סטטוס",
-          "סכום כולל",
-          "סכום מקדמה",
-          "תשלום סופי",
-          "שער חליפין",
-          "מספר קונטיינר",
-          "הערות",
-          "עלות שחרור נמל",
-          "מטבע מקורי",
-        ],
-
-        // שורה 5: דוגמה
+        // שורה 4: דוגמה
         [
           "ORD-2025-001",
           'ספק לדוגמה בע"מ',
@@ -196,7 +181,8 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "orders_template.xlsx";
+      const dateStamp = new Date().toISOString().split("T")[0];
+      filename = `orders_template_${dateStamp}.xlsx`;
     } else if (type === "categories") {
       const data = [
         // שורה 1: כותרות עמודות
@@ -216,7 +202,8 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "categories_template.xlsx";
+      const dateStamp = new Date().toISOString().split("T")[0];
+      filename = `categories_template_${dateStamp}.xlsx`;
     }
 
     XLSX.utils.book_append_sheet(workbook, worksheet!, "Template");
