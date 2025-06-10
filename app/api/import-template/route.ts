@@ -18,39 +18,39 @@ export async function GET(request: NextRequest) {
     if (type === "suppliers") {
       // תבנית ספקים
       const instructions = [
-        "הוראות: מלא את השורות החל מהשורה הרביעית. שדות חובה: שם הספק, מדינה. מחק את שורת הדוגמה לפני הייבוא (או השאר - המערכת תדלג עליה אוטומטית)",
+        "Instructions: Fill rows starting from row 4. Required fields: supplier name, country. Delete example row before import (or leave - system will skip automatically)",
       ];
 
       const headers = [
-        "שם הספק",
-        "מדינה",
-        "עיר",
-        "כתובת",
-        "טלפון",
-        "אימייל",
-        "איש קשר",
-        "טלפון איש קשר",
-        "תפקיד איש קשר",
-        "זמן ייצור (שבועות)",
-        "זמן שילוח (שבועות)",
-        "תשלום מקדמה",
-        "אחוז מקדמה",
-        "מטבע",
+        "Supplier Name",
+        "Country",
+        "City",
+        "Address",
+        "Phone",
+        "Email",
+        "Contact Person",
+        "Contact Phone",
+        "Contact Position",
+        "Production Time (weeks)",
+        "Shipping Time (weeks)",
+        "Advance Payment",
+        "Advance Percentage",
+        "Currency",
       ];
 
       const exampleData = [
-        "דוגמה - מחק שורה זו",
-        "סין",
-        "שנגחאי",
-        "123 רחוב התעשייה",
+        "EXAMPLE - DELETE THIS ROW",
+        "China",
+        "Shanghai",
+        "123 Industry Street",
         "+86-21-1234567",
         "info@supplier.com",
-        "ג'ון דו",
+        "John Doe",
         "+86-21-1234568",
-        "מנהל מכירות",
+        "Sales Manager",
         4,
         2,
-        "כן",
+        "Yes",
         30,
         "USD",
       ];
@@ -63,31 +63,31 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_ספקים.xlsx";
+      filename = "suppliers_template.xlsx";
     } else if (type === "orders") {
       // תבנית הזמנות
       const instructions = [
-        "הוראות: מלא את השורות החל מהשורה הרביעית. שדות חובה: מספר הזמנה, שם ספק. מחק את שורת הדוגמה לפני הייבוא (או השאר - המערכת תדלג עליה אוטומטית)",
+        "Instructions: Fill rows starting from row 4. Required fields: order number, supplier name. Delete example row before import (or leave - system will skip automatically)",
       ];
 
       const headers = [
-        "מספר הזמנה",
-        "שם ספק",
-        "תאריך ETA",
-        "סטטוס",
-        "סכום כולל",
-        "סכום מקדמה",
-        "תשלום סופי",
-        "שער חליפין",
-        "מספר קונטיינר",
-        "הערות",
-        "עלות שחרור נמל",
-        "מטבע מקורי",
+        "Order Number",
+        "Supplier Name",
+        "ETA Date",
+        "Status",
+        "Total Amount",
+        "Advance Amount",
+        "Final Payment",
+        "Exchange Rate",
+        "Container Number",
+        "Notes",
+        "Port Release Cost",
+        "Original Currency",
       ];
 
       const exampleData = [
-        "דוגמה - מחק שורה זו",
-        'ספק לדוגמה בע"מ',
+        "EXAMPLE - DELETE THIS ROW",
+        "Example Supplier Ltd",
         "2025-03-15",
         "PENDING",
         5500,
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         3850,
         3.8,
         "CONT123456",
-        "דחוף",
+        "Urgent",
         500,
         "USD",
       ];
@@ -107,16 +107,16 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_הזמנות.xlsx";
+      filename = "orders_template.xlsx";
     } else if (type === "categories") {
       // תבנית קטגוריות
       const instructions = [
-        "הוראות: מלא את השורות החל מהשורה הרביעית. שדות חובה: שם קטגוריה. מחק את שורת הדוגמה לפני הייבוא (או השאר - המערכת תדלג עליה אוטומטית)",
+        "Instructions: Fill rows starting from row 4. Required fields: category name. Delete example row before import (or leave - system will skip automatically)",
       ];
 
-      const headers = ["שם קטגוריה", "תיאור"];
+      const headers = ["Category Name", "Description"];
 
-      const exampleData = ["דוגמה - מחק שורה זו", "צעצועים וכדורים לכלבים"];
+      const exampleData = ["EXAMPLE - DELETE THIS ROW", "Dog toys and balls"];
 
       const data = [
         instructions, // שורה 1
@@ -125,11 +125,11 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_קטגוריות.xlsx";
+      filename = "categories_template.xlsx";
     }
 
     // הוספת הדף לקובץ
-    XLSX.utils.book_append_sheet(workbook, worksheet!, "תבנית");
+    XLSX.utils.book_append_sheet(workbook, worksheet!, "Template");
 
     // המרה ל-buffer
     const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
