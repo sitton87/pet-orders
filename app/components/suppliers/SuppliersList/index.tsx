@@ -300,7 +300,7 @@ export default function SuppliersList() {
             productionTimeWeeks: selectedSupplier.productionTimeWeeks || 1,
             shippingTimeWeeks: selectedSupplier.shippingTimeWeeks || 1,
             updatedAt: selectedSupplier.updatedAt || selectedSupplier.createdAt,
-            contactName: selectedSupplier.contactName || "",
+            contactPerson: selectedSupplier.contactPerson || "",
             contactEmail: selectedSupplier.contactEmail || "",
             notes: selectedSupplier.notes || "",
             paymentTerms: selectedSupplier.paymentTerms || "",
