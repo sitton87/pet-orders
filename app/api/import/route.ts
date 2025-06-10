@@ -21,9 +21,9 @@ export async function POST(request: NextRequest) {
     const workbook = XLSX.read(arrayBuffer, { type: "array" });
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
-    // המרה לJSON (התחלה משורה 2 - אחרי הכותרות)
+    // המרה לJSON - מתחיל משורה 3 (כולל דוגמה)
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      range: 1, // מתחיל משורה 2 (אינדקס 1) - אחרי כותרות
+      range: 2, // מתחיל משורה 3 (אינדקס 2)
       defval: null,
     });
 

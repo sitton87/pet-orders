@@ -7,78 +7,110 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
 
     if (!type || !["suppliers", "orders", "categories"].includes(type)) {
-      return NextResponse.json(
-        { error: "Invalid template type" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "סוג תבנית לא תקין" }, { status: 400 });
     }
 
     const workbook = XLSX.utils.book_new();
     let worksheet: XLSX.WorkSheet;
-    let filename = "template.xlsx";
+    let filename = "תבנית.xlsx";
 
     if (type === "suppliers") {
       const data = [
+        // שורה 1: כותרות עמודות
         [
-          "Instructions: Fill data starting from row 4. Required: Supplier Name, Country",
+          "שם הספק",
+          "מדינה",
+          "עיר",
+          "כתובת",
+          "טלפון",
+          "אימייל",
+          "איש קשר",
+          "טלפון איש קשר",
+          "תפקיד איש קשר",
+          "זמן ייצור (שבועות)",
+          "זמן שילוח (שבועות)",
+          "תשלום מקדמה",
+          "אחוז מקדמה",
+          "מטבע",
         ],
+
+        // שורה 2: הוראות ודרישות
         [
-          "Supplier Name",
-          "Country",
-          "City",
-          "Address",
-          "Phone",
-          "Email",
-          "Contact Person",
-          "Contact Phone",
-          "Contact Position",
-          "Production Time (weeks)",
-          "Shipping Time (weeks)",
-          "Advance Payment",
-          "Advance Percentage",
-          "Currency",
+          "הוראות: מלא נתונים החל משורה 4. שדות חובה: שם הספק, מדינה. תשלום מקדמה: כן/לא",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
         ],
+
+        // שורה 3: דוגמה למחיקה
         [
-          "EXAMPLE - DELETE ROW",
-          "China",
-          "Shanghai",
-          "123 Street",
+          "דוגמה - מחק שורה זו",
+          "סין",
+          "שנגחאי",
+          "123 רחוב התעשייה",
           "+86-21-1234567",
           "info@supplier.com",
-          "John Doe",
+          "ג'ון דו",
           "+86-21-1234568",
-          "Sales Manager",
+          "מנהל מכירות",
           4,
           2,
-          "Yes",
+          "כן",
           30,
           "USD",
         ],
       ];
+
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "suppliers_template.xlsx";
+      filename = "תבנית_ספקים.xlsx";
     } else if (type === "orders") {
       const data = [
+        // שורה 1: כותרות עמודות
         [
-          "Instructions: Fill data starting from row 4. Required: Order Number, Supplier Name",
+          "מספר הזמנה",
+          "שם ספק",
+          "תאריך ETA",
+          "סטטוס",
+          "סכום כולל",
+          "סכום מקדמה",
+          "תשלום סופי",
+          "שער חליפין",
+          "מספר קונטיינר",
+          "הערות",
+          "עלות שחרור נמל",
+          "מטבע מקורי",
         ],
+
+        // שורה 2: הוראות ודרישות
         [
-          "Order Number",
-          "Supplier Name",
-          "ETA Date",
-          "Status",
-          "Total Amount",
-          "Advance Amount",
-          "Final Payment",
-          "Exchange Rate",
-          "Container Number",
-          "Notes",
-          "Port Release Cost",
-          "Original Currency",
+          "הוראות: מלא נתונים החל משורה 4. שדות חובה: מספר הזמנה, שם ספק. תאריך: YYYY-MM-DD",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
+          "",
         ],
+
+        // שורה 3: דוגמה למחיקה
         [
-          "EXAMPLE - DELETE ROW",
-          "Example Supplier",
+          "דוגמה - מחק שורה זו",
+          'ספק לדוגמה בע"מ',
           "2025-03-15",
           "PENDING",
           5500,
@@ -86,27 +118,38 @@ export async function GET(request: NextRequest) {
           3850,
           3.8,
           "CONT123456",
-          "Urgent",
+          "דחוף",
           500,
           "USD",
         ],
       ];
+
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "orders_template.xlsx";
+      filename = "תבנית_הזמנות.xlsx";
     } else if (type === "categories") {
       const data = [
-        [
-          "Instructions: Fill data starting from row 4. Required: Category Name",
-        ],
-        ["Category Name", "Description"],
-        ["EXAMPLE - DELETE ROW", "Dog toys and accessories"],
+        // שורה 1: כותרות עמודות
+        ["שם קטגוריה", "תיאור"],
+
+        // שורה 2: הוראות ודרישות
+        ["הוראות: מלא נתונים החל משורה 4. שדות חובה: שם קטגוריה", ""],
+
+        // שורה 3: דוגמה למחיקה
+        ["דוגמה - מחק שורה זו", "צעצועים וכדורים לכלבים"],
       ];
+
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "categories_template.xlsx";
+      filename = "תבנית_קטגוריות.xlsx";
     }
 
-    XLSX.utils.book_append_sheet(workbook, worksheet!, "Template");
-    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+    XLSX.utils.book_append_sheet(workbook, worksheet!, "תבנית");
+
+    // שימוש ב-array type למניעת בעיות encoding
+    const buffer = XLSX.write(workbook, {
+      type: "array",
+      bookType: "xlsx",
+      compression: true,
+    });
 
     return new NextResponse(buffer, {
       headers: {
@@ -117,10 +160,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error("Template creation error:", error);
-    return NextResponse.json(
-      { error: "Template creation failed" },
-      { status: 500 }
-    );
+    console.error("שגיאה ביצירת תבנית:", error);
+    return NextResponse.json({ error: "שגיאה ביצירת תבנית" }, { status: 500 });
   }
 }
