@@ -12,7 +12,7 @@ export async function GET(request: NextRequest) {
 
     const workbook = XLSX.utils.book_new();
     let worksheet: XLSX.WorkSheet;
-    let filename = "תבנית.xlsx";
+    let filename = "template.xlsx";
 
     if (type === "suppliers") {
       const data = [
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_ספקים.xlsx";
+      filename = "suppliers_template.xlsx";
     } else if (type === "orders") {
       const data = [
         // שורה 1: כותרות עמודות
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_הזמנות.xlsx";
+      filename = "orders_template.xlsx";
     } else if (type === "categories") {
       const data = [
         // שורה 1: כותרות עמודות
@@ -139,23 +139,24 @@ export async function GET(request: NextRequest) {
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
-      filename = "תבנית_קטגוריות.xlsx";
+      filename = "categories_template.xlsx";
     }
 
-    XLSX.utils.book_append_sheet(workbook, worksheet!, "תבנית");
+    XLSX.utils.book_append_sheet(workbook, worksheet!, "Sheet1");
 
-    // שימוש ב-array type למניעת בעיות encoding
+    // שימוש ב-buffer type עם encoding מפורש
     const buffer = XLSX.write(workbook, {
-      type: "array",
+      type: "buffer",
       bookType: "xlsx",
-      compression: true,
     });
 
     return new NextResponse(buffer, {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename="${filename}"`,
+        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(
+          filename
+        )}`,
         "Content-Length": buffer.length.toString(),
       },
     });
