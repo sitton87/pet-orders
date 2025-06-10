@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-// GET - קבלת כל הקטגוריות
 export async function GET() {
   try {
     const categories = await prisma.productCategory.findMany({
+      include: {
+        _count: {
+          select: {
+            supplierCategories: true,
+            orderCategories: true,
+          },
+        },
+      },
       orderBy: {
         name: "asc",
       },
@@ -20,19 +27,18 @@ export async function GET() {
   }
 }
 
-// POST - יצירת קטגוריה חדשה
 export async function POST(request: NextRequest) {
   try {
     const { name, description } = await request.json();
 
-    if (!name) {
+    if (!name || !name.trim()) {
       return NextResponse.json({ error: "שם קטגוריה נדרש" }, { status: 400 });
     }
 
-    // בדיקה שהקטגוריה לא קיימת כבר
+    // בדיקה שהקטגוריה לא קיימת
     const existingCategory = await prisma.productCategory.findFirst({
       where: {
-        name: name,
+        name: name.trim(),
       },
     });
 
@@ -45,8 +51,8 @@ export async function POST(request: NextRequest) {
 
     const newCategory = await prisma.productCategory.create({
       data: {
-        name,
-        description: description || null,
+        name: name.trim(),
+        description: description?.trim() || null,
       },
     });
 
@@ -60,14 +66,13 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// PUT - עדכון קטגוריה
 export async function PUT(request: NextRequest) {
   try {
     const { id, name, description } = await request.json();
 
-    if (!id || !name) {
+    if (!id || !name || !name.trim()) {
       return NextResponse.json(
-        { error: "מזהה וחם קטגוריה נדרשים" },
+        { error: "מזהה וקטגוריה נדרשים" },
         { status: 400 }
       );
     }
@@ -84,10 +89,8 @@ export async function PUT(request: NextRequest) {
     // בדיקה שאין קטגוריה אחרת עם אותו שם
     const duplicateCategory = await prisma.productCategory.findFirst({
       where: {
-        name: name,
-        NOT: {
-          id: id,
-        },
+        name: name.trim(),
+        NOT: { id },
       },
     });
 
@@ -101,8 +104,8 @@ export async function PUT(request: NextRequest) {
     const updatedCategory = await prisma.productCategory.update({
       where: { id },
       data: {
-        name,
-        description: description || null,
+        name: name.trim(),
+        description: description?.trim() || null,
       },
     });
 
@@ -116,14 +119,13 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-// DELETE - מחיקת קטגוריה
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
 
     if (!id) {
-      return NextResponse.json({ error: "מזהה קטגוריה נדרש" }, { status: 400 });
+      return NextResponse.json({ error: "מזהה קטגוריה חסר" }, { status: 400 });
     }
 
     // בדיקה שהקטגוריה קיימת
@@ -135,22 +137,39 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "קטגוריה לא נמצאה" }, { status: 404 });
     }
 
-    // בדיקה שאין ספקים שמשתמשים בקטגוריה זו
-    const suppliersUsingCategory = await prisma.supplier.findMany({
+    // בדיקה שאין ספקים המשתמשים בקטגוריה הזו
+    const suppliersUsingCategory = await prisma.supplierCategory.findMany({
       where: {
-        productCategory: existingCategory.name,
+        categoryId: id,
       },
     });
 
     if (suppliersUsingCategory.length > 0) {
       return NextResponse.json(
         {
-          error: `לא ניתן למחוק קטגוריה זו - ${suppliersUsingCategory.length} ספקים משתמשים בה`,
+          error: `לא ניתן למחוק קטגוריה זו - היא בשימוש על ידי ${suppliersUsingCategory.length} ספקים`,
         },
         { status: 400 }
       );
     }
 
+    // בדיקה שאין הזמנות המשתמשות בקטגוריה הזו
+    const ordersUsingCategory = await prisma.orderCategory.findMany({
+      where: {
+        categoryId: id,
+      },
+    });
+
+    if (ordersUsingCategory.length > 0) {
+      return NextResponse.json(
+        {
+          error: `לא ניתן למחוק קטגוריה זו - היא בשימוש על ידי ${ordersUsingCategory.length} הזמנות`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // מחיקת הקטגוריה
     await prisma.productCategory.delete({
       where: { id },
     });
