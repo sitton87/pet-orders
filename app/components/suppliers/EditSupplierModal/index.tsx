@@ -10,6 +10,12 @@ interface EditSupplierModalProps {
   supplier: Supplier | null;
 }
 
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+}
+
 export default function EditSupplierModal({
   isOpen,
   onClose,
@@ -24,7 +30,7 @@ export default function EditSupplierModal({
     address: "",
     phone: "",
     email: "",
-    contactPerson: "", // שונה מ-contactPerson
+    contactPerson: "",
     contactPhone: "",
     contactPosition: "",
     productionTimeWeeks: 1,
@@ -40,9 +46,9 @@ export default function EditSupplierModal({
     beneficiary: "",
     iban: "",
     bic: "",
+    connection: "",
     createdAt: "",
     updatedAt: "",
-    contactEmail: "",
     notes: "",
     paymentTerms: "",
     minimumOrder: 0,
@@ -50,6 +56,9 @@ export default function EditSupplierModal({
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>(
+    []
+  );
 
   // טעינת נתוני הספק כשהmodal נפתח
   useEffect(() => {
@@ -65,8 +74,29 @@ export default function EditSupplierModal({
           : "",
       });
       setCurrentStep(1);
+      loadAvailableCurrencies();
     }
   }, [supplier, isOpen]);
+
+  const loadAvailableCurrencies = async () => {
+    try {
+      const response = await fetch("/api/settings/currencies");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCurrencies(data.currencies);
+      }
+    } catch (error) {
+      console.error("Error loading currencies:", error);
+      // מטבעות ברירת מחדל במקרה של שגיאה
+      setAvailableCurrencies([
+        { code: "USD", name: "דולר אמריקני", symbol: "$" },
+        { code: "EUR", name: "יורו", symbol: "€" },
+        { code: "GBP", name: "לירה שטרלינג", symbol: "£" },
+        { code: "CNY", name: "יואן סיני", symbol: "¥" },
+        { code: "ILS", name: "שקל ישראלי", symbol: "₪" },
+      ]);
+    }
+  };
 
   const handleInputChange = (field: keyof Supplier, value: any) => {
     setFormData((prev) => ({
@@ -219,6 +249,7 @@ export default function EditSupplierModal({
                   />
                 </div>
 
+                {/* מטבע דינמי */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     מטבע <span className="text-red-500">*</span>
@@ -230,11 +261,39 @@ export default function EditSupplierModal({
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="USD">USD - דולר אמריקאי</option>
-                    <option value="EUR">EUR - יורו</option>
-                    <option value="GBP">GBP - לירה שטרלינג</option>
-                    <option value="CNY">CNY - יואן סיני</option>
+                    {availableCurrencies.length > 0 ? (
+                      availableCurrencies.map((currency) => (
+                        <option key={currency.code} value={currency.code}>
+                          {currency.code} - {currency.name}
+                        </option>
+                      ))
+                    ) : (
+                      // ברירת מחדל בזמן טעינה
+                      <>
+                        <option value="USD">USD - דולר אמריקני</option>
+                        <option value="EUR">EUR - יורו</option>
+                        <option value="GBP">GBP - לירה שטרלינג</option>
+                        <option value="CNY">CNY - יואן סיני</option>
+                        <option value="ILS">ILS - שקל ישראלי</option>
+                      </>
+                    )}
                   </select>
+                </div>
+
+                {/* שדה חיבור/קישור */}
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    קישור/חיבור
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.connection || ""}
+                    onChange={(e) =>
+                      handleInputChange("connection", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="אתר אינטרנט, אימייל נוסף או מספר טלפון"
+                  />
                 </div>
               </div>
             </div>

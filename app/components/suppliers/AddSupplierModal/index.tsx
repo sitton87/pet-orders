@@ -42,11 +42,18 @@ interface ProductCategory {
   description?: string;
 }
 
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
+}
+
 export default function AddSupplierModal({
   isOpen,
   onClose,
   onAddSupplier,
 }: AddSupplierModalProps) {
+  // ✅ כל ה-useState בתוך הקומפוננט
   const [formData, setFormData] = useState<SupplierFormData>({
     name: "",
     country: "",
@@ -78,11 +85,15 @@ export default function AddSupplierModal({
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>(
+    []
+  ); // ✅ הועבר לכאן
 
-  // 🆕 טעינת קטגוריות
+  // ✅ כל ה-useEffect אחרי ה-useState
   useEffect(() => {
     if (isOpen) {
       loadCategories();
+      loadAvailableCurrencies();
     }
   }, [isOpen]);
 
@@ -95,6 +106,26 @@ export default function AddSupplierModal({
       }
     } catch (error) {
       console.error("Error loading categories:", error);
+    }
+  };
+
+  const loadAvailableCurrencies = async () => {
+    try {
+      const response = await fetch("/api/settings/currencies");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCurrencies(data.currencies);
+      }
+    } catch (error) {
+      console.error("Error loading currencies:", error);
+      // מטבעות ברירת מחדל במקרה של שגיאה
+      setAvailableCurrencies([
+        { code: "USD", name: "דולר אמריקני", symbol: "$" },
+        { code: "EUR", name: "יורו", symbol: "€" },
+        { code: "GBP", name: "לירה שטרלינג", symbol: "£" },
+        { code: "CNY", name: "יואן סיני", symbol: "¥" },
+        { code: "ILS", name: "שקל ישראלי", symbol: "₪" },
+      ]);
     }
   };
 
@@ -287,6 +318,7 @@ export default function AddSupplierModal({
                   />
                 </div>
 
+                {/* ✅ מטבע דינמי */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     מטבע <span className="text-red-500">*</span>
@@ -298,10 +330,22 @@ export default function AddSupplierModal({
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    <option value="USD">USD - דולר אמריקאי</option>
-                    <option value="EUR">EUR - יורו</option>
-                    <option value="GBP">GBP - לירה שטרלינג</option>
-                    <option value="CNY">CNY - יואן סיני</option>
+                    {availableCurrencies.length > 0 ? (
+                      availableCurrencies.map((currency) => (
+                        <option key={currency.code} value={currency.code}>
+                          {currency.code} - {currency.name}
+                        </option>
+                      ))
+                    ) : (
+                      // ברירת מחדל בזמן טעינה
+                      <>
+                        <option value="USD">USD - דולר אמריקני</option>
+                        <option value="EUR">EUR - יורו</option>
+                        <option value="GBP">GBP - לירה שטרלינג</option>
+                        <option value="CNY">CNY - יואן סיני</option>
+                        <option value="ILS">ILS - שקל ישראלי</option>
+                      </>
+                    )}
                   </select>
                 </div>
               </div>
