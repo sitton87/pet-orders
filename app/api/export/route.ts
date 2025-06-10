@@ -126,33 +126,29 @@ async function exportOrders() {
 }
 
 async function exportCategories() {
-  // לעת עתה נחזיר נתונים דמה עד שנוסיף טבלת קטגוריות לדאטבייס
-  return [
-    {
-      מזהה: "1",
-      "שם הקטגוריה": "צעצועים",
-      תיאור: "צעצועים לכלבים וחתולים",
-      "מספר הזמנות": 12,
-      "תאריך יצירה": new Date().toLocaleDateString("he-IL"),
-      "תאריך עדכון": new Date().toLocaleDateString("he-IL"),
-    },
-    {
-      מזהה: "2",
-      "שם הקטגוריה": "מיטות וכריות",
-      תיאור: "מיטות, כריות וציוד שינה",
-      "מספר הזמנות": 8,
-      "תאריך יצירה": new Date().toLocaleDateString("he-IL"),
-      "תאריך עדכון": new Date().toLocaleDateString("he-IL"),
-    },
-    {
-      מזהה: "3",
-      "שם הקטגוריה": "קערות ושתייה",
-      תיאור: "קערות אוכל ומים, מתקני שתייה",
-      "מספר הזמנות": 15,
-      "תאריך יצירה": new Date().toLocaleDateString("he-IL"),
-      "תאריך עדכון": new Date().toLocaleDateString("he-IL"),
-    },
-  ];
+  const categories = await prisma.productCategory.findMany({
+    orderBy: { createdAt: "desc" },
+  });
+
+  // ספירת ספקים לכל קטגוריה דרך טבלת הביניים
+  const categoriesWithCounts = await Promise.all(
+    categories.map(async (category) => {
+      const supplierCount = await prisma.supplierCategory.count({
+        where: { categoryId: category.id },
+      });
+
+      return {
+        מזהה: category.id,
+        "שם הקטגוריה": category.name,
+        תיאור: category.description || "",
+        "מספר ספקים": supplierCount,
+        "תאריך יצירה": new Date(category.createdAt).toLocaleDateString("he-IL"),
+        "תאריך עדכון": new Date(category.updatedAt).toLocaleDateString("he-IL"),
+      };
+    })
+  );
+
+  return categoriesWithCounts;
 }
 
 async function exportAllData() {
