@@ -4,13 +4,21 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/Navbar";
-import { Database, Package, Building2, Settings, FileText } from "lucide-react";
+import {
+  Database,
+  Package,
+  Building2,
+  Settings,
+  FileText,
+  Archive,
+} from "lucide-react";
 
 // Import tab components
 import ProductCategories from "@/components/data/ProductCategories";
 import CustomsManagement from "@/components/data/CustomsManagement";
 import SystemSettings from "@/components/data/SystemSettings";
 import DataTools from "@/components/data/DataTools";
+import ArchiveManagement from "@/components/data/ArchiveManagement";
 
 export default function DataPage() {
   const { data: session, status } = useSession();
@@ -58,6 +66,12 @@ export default function DataPage() {
       name: "כלי ניהול",
       icon: FileText,
       component: DataTools,
+    },
+    {
+      id: "archive",
+      name: "ארכיון ספקים",
+      icon: Archive,
+      component: ArchiveManagement,
     },
   ];
 
