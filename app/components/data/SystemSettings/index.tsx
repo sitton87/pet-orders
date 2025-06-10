@@ -71,6 +71,10 @@ export default function SystemSettings() {
         ? await currenciesResponse.json()
         : { currencies: [] };
 
+      // 🔍 הוסף debug logs
+      console.log("statusesData:", statusesData);
+      console.log("currenciesData:", currenciesData);
+
       // טעינת הגדרות כלליות (אם יש)
       let generalSettings = {
         default_currency: "USD",
@@ -90,8 +94,12 @@ export default function SystemSettings() {
       }
 
       setSettings({
-        order_statuses: statusesData.statuses || [],
-        currencies: currenciesData.currencies || [],
+        order_statuses: Array.isArray(statusesData.statuses)
+          ? statusesData.statuses
+          : [],
+        currencies: Array.isArray(currenciesData.currencies)
+          ? currenciesData.currencies
+          : [],
         ...generalSettings,
       });
     } catch (error) {
@@ -182,6 +190,7 @@ export default function SystemSettings() {
       setSaving(false);
     }
   };
+
   // 🆕 עריכת סטטוס
   const handleEditStatus = (index: number) => {
     setEditingStatus({ index, value: settings.order_statuses[index] });
@@ -357,69 +366,70 @@ export default function SystemSettings() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-            {settings.order_statuses.map((status, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-white p-3 rounded border"
-              >
-                {editingStatus?.index === index ? (
-                  // מצב עריכה
-                  <div className="flex items-center space-x-2 flex-1">
-                    <input
-                      type="text"
-                      value={editingStatus.value}
-                      onChange={(e) =>
-                        setEditingStatus({
-                          ...editingStatus,
-                          value: e.target.value,
-                        })
-                      }
-                      className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      onKeyPress={(e) => {
-                        if (e.key === "Enter") handleSaveStatusEdit();
-                        if (e.key === "Escape") handleCancelStatusEdit();
-                      }}
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleSaveStatusEdit}
-                      className="text-green-600 hover:text-green-800"
-                      title="שמור"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={handleCancelStatusEdit}
-                      className="text-gray-500 hover:text-gray-700"
-                      title="בטל"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  // מצב רגיל
-                  <>
-                    <span className="text-sm flex-1">{status}</span>
-                    <div className="flex items-center space-x-1">
+            {Array.isArray(settings.order_statuses) &&
+              settings.order_statuses.map((status, index) => (
+                <div
+                  key={index}
+                  className="flex items-center justify-between bg-white p-3 rounded border"
+                >
+                  {editingStatus?.index === index ? (
+                    // מצב עריכה
+                    <div className="flex items-center space-x-2 flex-1">
+                      <input
+                        type="text"
+                        value={editingStatus.value}
+                        onChange={(e) =>
+                          setEditingStatus({
+                            ...editingStatus,
+                            value: e.target.value,
+                          })
+                        }
+                        className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        onKeyPress={(e) => {
+                          if (e.key === "Enter") handleSaveStatusEdit();
+                          if (e.key === "Escape") handleCancelStatusEdit();
+                        }}
+                        autoFocus
+                      />
                       <button
-                        onClick={() => handleEditStatus(index)}
-                        className="text-blue-500 hover:text-blue-700"
-                        title="ערוך סטטוס"
+                        onClick={handleSaveStatusEdit}
+                        className="text-green-600 hover:text-green-800"
+                        title="שמור"
                       >
-                        <Edit className="h-4 w-4" />
+                        <Check className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => handleRemoveStatus(status)}
-                        className="text-red-500 hover:text-red-700"
-                        title="מחק סטטוס"
+                        onClick={handleCancelStatusEdit}
+                        className="text-gray-500 hover:text-gray-700"
+                        title="בטל"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <X className="h-4 w-4" />
                       </button>
                     </div>
-                  </>
-                )}
-              </div>
-            ))}
+                  ) : (
+                    // מצב רגיל
+                    <>
+                      <span className="text-sm flex-1">{status}</span>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => handleEditStatus(index)}
+                          className="text-blue-500 hover:text-blue-700"
+                          title="ערוך סטטוס"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleRemoveStatus(status)}
+                          className="text-red-500 hover:text-red-700"
+                          title="מחק סטטוס"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
           </div>
         </div>
       </div>
@@ -438,127 +448,134 @@ export default function SystemSettings() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {settings.currencies.map((currency, index) => (
-            <div key={currency.code} className="bg-white p-4 rounded border">
-              {editingCurrency?.index === index ? (
-                // מצב עריכה
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      קוד
-                    </label>
-                    <input
-                      type="text"
-                      value={editingCurrency.currency.code}
-                      onChange={(e) =>
-                        setEditingCurrency({
-                          ...editingCurrency,
-                          currency: {
-                            ...editingCurrency.currency,
-                            code: e.target.value.toUpperCase(),
-                          },
-                        })
-                      }
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      maxLength={3}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      שם
-                    </label>
-                    <input
-                      type="text"
-                      value={editingCurrency.currency.name}
-                      onChange={(e) =>
-                        setEditingCurrency({
-                          ...editingCurrency,
-                          currency: {
-                            ...editingCurrency.currency,
-                            name: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      סמל
-                    </label>
-                    <input
-                      type="text"
-                      value={editingCurrency.currency.symbol}
-                      onChange={(e) =>
-                        setEditingCurrency({
-                          ...editingCurrency,
-                          currency: {
-                            ...editingCurrency.currency,
-                            symbol: e.target.value,
-                          },
-                        })
-                      }
-                      className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                      maxLength={3}
-                    />
-                  </div>
-                  <div className="flex justify-end space-x-2">
-                    <button
-                      onClick={handleSaveCurrencyEdit}
-                      className="text-green-600 hover:text-green-800"
-                      title="שמור"
-                    >
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={handleCancelCurrencyEdit}
-                      className="text-gray-500 hover:text-gray-700"
-                      title="בטל"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                // מצב רגיל
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{currency.name}</div>
-                    <div className="text-sm text-gray-600">
-                      {currency.code} ({currency.symbol})
-                      {currency.code === settings.default_currency && (
-                        <span className="text-blue-600 font-medium">
-                          {" "}
-                          • ברירת מחדל
-                        </span>
-                      )}
+          {Array.isArray(settings.currencies) &&
+          settings.currencies.length > 0 ? (
+            settings.currencies.map((currency, index) => (
+              <div key={currency.code} className="bg-white p-4 rounded border">
+                {editingCurrency?.index === index ? (
+                  // מצב עריכה
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        קוד
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCurrency.currency.code}
+                        onChange={(e) =>
+                          setEditingCurrency({
+                            ...editingCurrency,
+                            currency: {
+                              ...editingCurrency.currency,
+                              code: e.target.value.toUpperCase(),
+                            },
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        maxLength={3}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        שם
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCurrency.currency.name}
+                        onChange={(e) =>
+                          setEditingCurrency({
+                            ...editingCurrency,
+                            currency: {
+                              ...editingCurrency.currency,
+                              name: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                        סמל
+                      </label>
+                      <input
+                        type="text"
+                        value={editingCurrency.currency.symbol}
+                        onChange={(e) =>
+                          setEditingCurrency({
+                            ...editingCurrency,
+                            currency: {
+                              ...editingCurrency.currency,
+                              symbol: e.target.value,
+                            },
+                          })
+                        }
+                        className="w-full px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        maxLength={3}
+                      />
+                    </div>
+                    <div className="flex justify-end space-x-2">
+                      <button
+                        onClick={handleSaveCurrencyEdit}
+                        className="text-green-600 hover:text-green-800"
+                        title="שמור"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={handleCancelCurrencyEdit}
+                        className="text-gray-500 hover:text-gray-700"
+                        title="בטל"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
-                  <div className="flex items-center space-x-1">
-                    <button
-                      onClick={() => handleEditCurrency(index)}
-                      className="text-blue-500 hover:text-blue-700"
-                      title="ערוך מטבע"
-                    >
-                      <Edit className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleRemoveCurrency(currency.code)}
-                      disabled={currency.code === settings.default_currency}
-                      className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
-                      title={
-                        currency.code === settings.default_currency
-                          ? "לא ניתן למחוק מטבע ברירת מחדל"
-                          : "מחק מטבע"
-                      }
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                ) : (
+                  // מצב רגיל
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{currency.name}</div>
+                      <div className="text-sm text-gray-600">
+                        {currency.code} ({currency.symbol})
+                        {currency.code === settings.default_currency && (
+                          <span className="text-blue-600 font-medium">
+                            {" "}
+                            • ברירת מחדל
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <button
+                        onClick={() => handleEditCurrency(index)}
+                        className="text-blue-500 hover:text-blue-700"
+                        title="ערוך מטבע"
+                      >
+                        <Edit className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleRemoveCurrency(currency.code)}
+                        disabled={currency.code === settings.default_currency}
+                        className="text-red-500 hover:text-red-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                        title={
+                          currency.code === settings.default_currency
+                            ? "לא ניתן למחוק מטבע ברירת מחדל"
+                            : "מחק מטבע"
+                        }
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="col-span-2 text-center text-gray-500 p-4">
+              אין מטבעות זמינים
             </div>
-          ))}
+          )}
         </div>
       </div>
 
@@ -580,11 +597,12 @@ export default function SystemSettings() {
               }
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              {settings.currencies.map((currency) => (
-                <option key={currency.code} value={currency.code}>
-                  {currency.name} ({currency.code})
-                </option>
-              ))}
+              {Array.isArray(settings.currencies) &&
+                settings.currencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.name} ({currency.code})
+                  </option>
+                ))}
             </select>
           </div>
 
