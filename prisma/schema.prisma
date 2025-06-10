@@ -155,6 +155,7 @@ model Supplier {
   iban                 String?
   bic                  String?
   connection            String?  @map("connection")
+  isActive             Boolean  @default(true) 
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
   

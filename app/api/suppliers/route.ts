@@ -5,18 +5,13 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const suppliers = await prisma.supplier.findMany({
+      where: { isActive: true }, // ✨ הוסף שורה זו
       include: {
-        supplierCategories: {
-          include: {
-            category: true,
-          },
-        },
+        _count: { select: { orders: true } },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
-    console.log("Found suppliers:", suppliers.length);
+
     return NextResponse.json(suppliers);
   } catch (error) {
     console.error("Error fetching suppliers:", error);

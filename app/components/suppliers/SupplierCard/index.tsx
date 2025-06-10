@@ -9,6 +9,7 @@ import {
   DollarSign,
   Edit,
   Trash2,
+  Archive,
   User,
   ChevronDown,
   ChevronUp,
@@ -25,6 +26,7 @@ interface SupplierCardProps {
   supplier: Supplier;
   onEdit: (supplier: Supplier) => void;
   onDelete: (supplierId: string) => void;
+  onArchive?: (supplierId: string) => void; // ✨ הוסף שורה זו
 }
 
 interface Currency {
@@ -37,10 +39,12 @@ export default function SupplierCard({
   supplier,
   onEdit,
   onDelete,
+  onArchive,
 }: SupplierCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
 
   // 🆕 State למטבעות דינמיים
   const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>(
@@ -166,6 +170,28 @@ export default function SupplierCard({
     }
   };
 
+  const handleArchive = async () => {
+    if (!onArchive) return;
+
+    const confirmed = window.confirm(
+      `האם אתה בטוח שברצונך להעביר את "${supplier.name}" לארכיון?\n\n` +
+        "הספק יוסתר מהמערכת אך ההזמנות שלו יישמרו.\n" +
+        "ניתן לשחזר אותו בעתיד מדף הארכיון."
+    );
+
+    if (confirmed) {
+      setIsArchiving(true);
+      try {
+        await onArchive(supplier.id);
+      } catch (error) {
+        console.error("Archive error:", error);
+        alert("שגיאה בהעברה לארכיון");
+      } finally {
+        setIsArchiving(false);
+      }
+    }
+  };
+
   return (
     <div className="bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200">
       {/* כותרת הכרטיס */}
@@ -244,6 +270,18 @@ export default function SupplierCard({
             >
               <Edit className="h-4 w-4" />
             </button>
+            {onArchive && (
+              <button
+                onClick={handleArchive}
+                disabled={isArchiving}
+                className="p-2 text-orange-600 hover:bg-orange-50 rounded-md transition-colors disabled:opacity-50"
+                title="העבר לארכיון"
+              >
+                <Archive
+                  className={`h-4 w-4 ${isArchiving ? "animate-pulse" : ""}`}
+                />
+              </button>
+            )}
             <button
               onClick={() => setShowDeleteConfirm(true)}
               className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"

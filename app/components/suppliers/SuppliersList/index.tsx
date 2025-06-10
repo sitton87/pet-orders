@@ -63,6 +63,25 @@ export default function SuppliersList() {
     }
   };
 
+  const handleArchiveSupplier = async (supplierId: string) => {
+    try {
+      const response = await fetch(`/api/suppliers/${supplierId}/archive`, {
+        method: "PATCH",
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to archive supplier");
+      }
+
+      const result = await response.json();
+      alert(result.message);
+      fetchSuppliers(); // רענן את הרשימה
+    } catch (error) {
+      console.error("Error archiving supplier:", error);
+      throw error;
+    }
+  };
+
   const handleAddSupplier = async (supplierData: any) => {
     try {
       const response = await fetch("/api/suppliers", {
@@ -271,6 +290,7 @@ export default function SuppliersList() {
               key={supplier.id}
               supplier={supplier}
               onEdit={handleEditClick}
+              onArchive={handleArchiveSupplier}
               onDelete={handleDeleteSupplier}
             />
           ))}
