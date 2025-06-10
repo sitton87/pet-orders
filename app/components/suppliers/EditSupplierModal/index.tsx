@@ -24,7 +24,7 @@ export default function EditSupplierModal({
     address: "",
     phone: "",
     email: "",
-    contactName: "", // שונה מ-contactPerson
+    contactPerson: "", // שונה מ-contactPerson
     contactPhone: "",
     contactPosition: "",
     productionTimeWeeks: 1,
@@ -252,9 +252,9 @@ export default function EditSupplierModal({
                   </label>
                   <input
                     type="text"
-                    value={formData.contactName || ""}
+                    value={formData.contactPerson || ""}
                     onChange={(e) =>
-                      handleInputChange("contactName", e.target.value)
+                      handleInputChange("contactPerson", e.target.value)
                     }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="שם איש הקשר"
