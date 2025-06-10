@@ -8,19 +8,19 @@ export interface Supplier {
   address?: string;
   phone?: string;
   email: string;
-  contactName?: string; // שונה מ-contactPerson
+  contactPerson?: string;
   contactPhone?: string;
   contactPosition?: string;
   contactEmail?: string;
-  productionTimeWeeks: number; // שונה מ-productionTime
-  shippingTimeWeeks: number; // שונה מ-shippingTime
+  productionTimeWeeks: number;
+  shippingTimeWeeks: number;
   hasAdvancePayment: boolean;
   advancePercentage?: number;
   currency: string;
   notes?: string;
   paymentTerms?: string;
   minimumOrder?: number;
-  // שדות מסמכים שהיו בקוד המקורי
+  // שדות מסמכים
   importLicense?: string;
   licenseExpiry?: string;
   feedLicense?: string;
@@ -29,6 +29,19 @@ export interface Supplier {
   beneficiary?: string;
   iban?: string;
   bic?: string;
+
+  // productCategory String, עכשיו relation
+  supplierCategories?: Array<{
+    id: string;
+    category: {
+      id: string;
+      name: string;
+      description?: string;
+    };
+  }>;
+
+  connection?: string;
+
   // שדות מערכת
   createdAt: string;
   updatedAt: string;

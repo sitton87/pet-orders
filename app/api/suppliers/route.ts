@@ -5,6 +5,13 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const suppliers = await prisma.supplier.findMany({
+      include: {
+        supplierCategories: {
+          include: {
+            category: true,
+          },
+        },
+      },
       orderBy: {
         createdAt: "desc",
       },
@@ -20,6 +27,8 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
+
+    // יצירת הספק
     const newSupplier = await prisma.supplier.create({
       data: {
         name: data.name,
@@ -36,9 +45,39 @@ export async function POST(request: NextRequest) {
         hasAdvancePayment: data.hasAdvancePayment || false,
         advancePercentage: data.advancePercentage || 0,
         currency: data.currency || "USD",
+        connection: data.connection || null, // 🆕 הוספנו connection
       },
     });
-    return NextResponse.json(newSupplier, { status: 201 });
+
+    // אם יש קטגוריות - הוסף אותן
+    if (
+      data.categoryIds &&
+      Array.isArray(data.categoryIds) &&
+      data.categoryIds.length > 0
+    ) {
+      const supplierCategories = data.categoryIds.map((categoryId: string) => ({
+        supplierId: newSupplier.id,
+        categoryId: categoryId,
+      }));
+
+      await prisma.supplierCategory.createMany({
+        data: supplierCategories,
+      });
+    }
+
+    // החזר את הספק עם הקטגוריות
+    const supplierWithCategories = await prisma.supplier.findUnique({
+      where: { id: newSupplier.id },
+      include: {
+        supplierCategories: {
+          include: {
+            category: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json(supplierWithCategories, { status: 201 });
   } catch (error) {
     console.error("Error creating supplier:", error);
     return NextResponse.json({ error: "שגיאה ביצירת ספק" }, { status: 500 });

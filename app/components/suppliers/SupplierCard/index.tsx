@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MapPin,
   Mail,
@@ -14,6 +14,9 @@ import {
   ChevronUp,
   FileText,
   Upload,
+  Package,
+  Link,
+  ExternalLink,
 } from "lucide-react";
 import type { Supplier } from "@/types";
 import FileUpload from "@/components/common/FileUpload";
@@ -22,6 +25,12 @@ interface SupplierCardProps {
   supplier: Supplier;
   onEdit: (supplier: Supplier) => void;
   onDelete: (supplierId: string) => void;
+}
+
+interface Currency {
+  code: string;
+  name: string;
+  symbol: string;
 }
 
 export default function SupplierCard({
@@ -33,9 +42,128 @@ export default function SupplierCard({
   const [showDetails, setShowDetails] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
 
+  // 🆕 State למטבעות דינמיים
+  const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>(
+    []
+  );
+  const [isUpdatingCurrency, setIsUpdatingCurrency] = useState(false);
+  const [currentCurrency, setCurrentCurrency] = useState(supplier.currency);
+
+  // 🔄 טעינת מטבעות זמינים
+  useEffect(() => {
+    loadAvailableCurrencies();
+  }, []);
+
+  const loadAvailableCurrencies = async () => {
+    try {
+      const response = await fetch("/api/settings/currencies");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableCurrencies(data.currencies);
+      }
+    } catch (error) {
+      console.error("Error loading currencies:", error);
+      // מטבעות ברירת מחדל במקרה של שגיאה
+      setAvailableCurrencies([
+        { code: "USD", name: "דולר אמריקני", symbol: "$" },
+        { code: "EUR", name: "יורו", symbol: "€" },
+        { code: "ILS", name: "שקל", symbol: "₪" },
+        { code: "GBP", name: "פאונד", symbol: "£" },
+      ]);
+    }
+  };
+
+  // 🔄 פונקציה לעדכון מטבע
+  const updateSupplierCurrency = async (newCurrency: string) => {
+    if (newCurrency === currentCurrency) return;
+
+    setIsUpdatingCurrency(true);
+    try {
+      const response = await fetch(`/api/suppliers/${supplier.id}/currency`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currency: newCurrency }),
+      });
+
+      if (response.ok) {
+        setCurrentCurrency(newCurrency);
+        // עדכון האובייקט המקומי
+        supplier.currency = newCurrency;
+      } else {
+        console.error("Failed to update currency");
+        // החזרת המטבע הקודם במקרה של שגיאה
+        setCurrentCurrency(supplier.currency);
+      }
+    } catch (error) {
+      console.error("Error updating currency:", error);
+      setCurrentCurrency(supplier.currency);
+    } finally {
+      setIsUpdatingCurrency(false);
+    }
+  };
+
+  // 🎨 קבלת סמל המטבע
+  const getCurrencySymbol = (currencyCode: string) => {
+    const currency = availableCurrencies.find((c) => c.code === currencyCode);
+    return currency?.symbol || currencyCode;
+  };
+
   const handleDelete = () => {
     setShowDeleteConfirm(false);
     onDelete(supplier.id);
+  };
+
+  // פונקציה לקבלת צבע קטגוריה לפי hash של השם
+  const getCategoryColor = (categoryName: string) => {
+    // יצירת צבע ייחודי לפי hash של השם
+    let hash = 0;
+    for (let i = 0; i < categoryName.length; i++) {
+      hash = categoryName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+
+    // מערך צבעים יפים
+    const colors = [
+      "bg-blue-100 text-blue-800",
+      "bg-green-100 text-green-800",
+      "bg-purple-100 text-purple-800",
+      "bg-red-100 text-red-800",
+      "bg-yellow-100 text-yellow-800",
+      "bg-indigo-100 text-indigo-800",
+      "bg-pink-100 text-pink-800",
+      "bg-orange-100 text-orange-800",
+    ];
+
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // פונקציה לבדיקה אם הקישור תקין
+  const isValidUrl = (url?: string) => {
+    if (!url) return false;
+    try {
+      new URL(url.startsWith("http") ? url : `https://${url}`);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // פונקציה לפתיחת קישור
+  const openConnection = (connection?: string) => {
+    if (!connection) return;
+
+    if (isValidUrl(connection)) {
+      const url = connection.startsWith("http")
+        ? connection
+        : `https://${connection}`;
+      window.open(url, "_blank");
+    } else if (connection.includes("@")) {
+      // אם זה מייל
+      window.open(`mailto:${connection}`, "_blank");
+    } else {
+      // אם זה טלפון או משהו אחר
+      navigator.clipboard.writeText(connection);
+      alert("הועתק ללוח");
+    }
   };
 
   return (
@@ -44,9 +172,30 @@ export default function SupplierCard({
       <div className="p-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              {supplier.name}
-            </h3>
+            <div className="flex items-center space-x-3 mb-2">
+              <h3 className="text-lg font-semibold text-gray-900">
+                {supplier.name}
+              </h3>
+              {/* קטגוריות מוצרים - מרובות */}
+              {supplier.supplierCategories &&
+                supplier.supplierCategories.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {supplier.supplierCategories.map((sc) => (
+                      <span
+                        key={sc.id}
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getCategoryColor(
+                          sc.category.name
+                        )}`}
+                        title={sc.category.description || sc.category.name}
+                      >
+                        <Package className="h-3 w-3 mr-1" />
+                        {sc.category.name}
+                      </span>
+                    ))}
+                  </div>
+                )}
+            </div>
+
             <div className="space-y-2 text-sm text-gray-600">
               <div className="flex items-center space-x-2">
                 <MapPin className="h-4 w-4 text-gray-400" />
@@ -62,6 +211,19 @@ export default function SupplierCard({
                 <div className="flex items-center space-x-2">
                   <Phone className="h-4 w-4 text-gray-400" />
                   <span>{supplier.phone}</span>
+                </div>
+              )}
+              {/* קישור/חיבור */}
+              {supplier.connection && (
+                <div className="flex items-center space-x-2">
+                  <Link className="h-4 w-4 text-gray-400" />
+                  <button
+                    onClick={() => openConnection(supplier.connection)}
+                    className="text-blue-600 hover:text-blue-800 underline flex items-center space-x-1"
+                  >
+                    <span>{supplier.connection}</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </button>
                 </div>
               )}
             </div>
@@ -102,10 +264,36 @@ export default function SupplierCard({
                 {supplier.shippingTimeWeeks || 0} שבועות
               </span>
             </div>
-            <div className="flex items-center space-x-1">
+
+            {/* 🆕 Dropdown לעדכון מטבע */}
+            <div className="flex items-center space-x-1 relative">
               <DollarSign className="h-4 w-4 text-gray-400" />
-              <span className="text-gray-600">{supplier.currency}</span>
+              <select
+                value={currentCurrency}
+                onChange={(e) => updateSupplierCurrency(e.target.value)}
+                disabled={isUpdatingCurrency}
+                className={`text-gray-600 bg-transparent border-0 cursor-pointer text-sm pr-6 pl-1
+                  ${
+                    isUpdatingCurrency
+                      ? "opacity-50 cursor-not-allowed"
+                      : "hover:bg-gray-50"
+                  }
+                  focus:outline-none focus:ring-1 focus:ring-blue-500 rounded`}
+                title="שנה מטבע"
+              >
+                {availableCurrencies.map((currency) => (
+                  <option key={currency.code} value={currency.code}>
+                    {currency.symbol} {currency.code}
+                  </option>
+                ))}
+              </select>
+              {isUpdatingCurrency && (
+                <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+                </div>
+              )}
             </div>
+
             {supplier.hasAdvancePayment && (
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                 מקדמה {supplier.advancePercentage}%
@@ -131,15 +319,79 @@ export default function SupplierCard({
       {showDetails && (
         <div className="px-6 pb-6 border-t border-gray-100">
           <div className="pt-4 space-y-4">
+            {/* קטגוריות וחיבור */}
+            {((supplier.supplierCategories &&
+              supplier.supplierCategories.length > 0) ||
+              supplier.connection) && (
+              <div>
+                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                  מידע כללי
+                </h4>
+                <div className="space-y-2">
+                  {supplier.supplierCategories &&
+                    supplier.supplierCategories.length > 0 && (
+                      <div className="bg-gray-50 rounded-md p-3 text-sm">
+                        <div className="flex items-start space-x-2">
+                          <Package className="h-4 w-4 text-gray-400 mt-0.5" />
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900 mb-2">
+                              קטגוריות מוצרים:
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {supplier.supplierCategories.map((sc) => (
+                                <div
+                                  key={sc.id}
+                                  className={`px-2 py-1 rounded text-xs ${getCategoryColor(
+                                    sc.category.name
+                                  )}`}
+                                >
+                                  <div className="font-medium">
+                                    {sc.category.name}
+                                  </div>
+                                  {sc.category.description && (
+                                    <div className="text-xs opacity-75">
+                                      {sc.category.description}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  {supplier.connection && (
+                    <div className="bg-gray-50 rounded-md p-3 text-sm">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <Link className="h-4 w-4 text-gray-400" />
+                          <span className="font-medium text-gray-900">
+                            קישור/חיבור:
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => openConnection(supplier.connection)}
+                          className="text-blue-600 hover:text-blue-800 underline flex items-center space-x-1"
+                        >
+                          <span>{supplier.connection}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* איש קשר */}
-            {supplier.contactName && (
+            {supplier.contactPerson && (
               <div>
                 <h4 className="text-sm font-medium text-gray-900 mb-2 flex items-center">
                   <User className="h-4 w-4 mr-2" />
                   איש קשר
                 </h4>
                 <div className="bg-gray-50 rounded-md p-3 text-sm">
-                  <div className="font-medium">{supplier.contactName}</div>
+                  <div className="font-medium">{supplier.contactPerson}</div>
                   {supplier.contactPhone && (
                     <div className="text-gray-600">{supplier.contactPhone}</div>
                   )}
@@ -176,7 +428,24 @@ export default function SupplierCard({
               <div className="bg-gray-50 rounded-md p-3 text-sm">
                 <div className="flex justify-between items-center mb-2">
                   <span>מטבע:</span>
-                  <span className="font-medium">{supplier.currency}</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium">
+                      {getCurrencySymbol(currentCurrency)} {currentCurrency}
+                    </span>
+                    {availableCurrencies.find(
+                      (c) => c.code === currentCurrency
+                    ) && (
+                      <span className="text-xs text-gray-500">
+                        (
+                        {
+                          availableCurrencies.find(
+                            (c) => c.code === currentCurrency
+                          )?.name
+                        }
+                        )
+                      </span>
+                    )}
+                  </div>
                 </div>
                 {supplier.hasAdvancePayment ? (
                   <div className="flex justify-between items-center">

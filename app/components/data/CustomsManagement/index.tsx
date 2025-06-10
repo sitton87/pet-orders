@@ -18,24 +18,27 @@ interface CustomsCompany {
   address: string;
   phone: string;
   email: string;
-  contactName: string;
-  contactPosition: string;
   agents: CustomsAgent[];
   createdAt: string;
+  updatedAt: string;
 }
 
 interface CustomsAgent {
   id: string;
   name: string;
   phone: string;
-  email: string;
   position: string;
   customsCompanyId: string;
+  customsCompany?: {
+    name: string;
+  };
   createdAt: string;
+  updatedAt: string;
 }
 
 export default function CustomsManagement() {
   const [companies, setCompanies] = useState<CustomsCompany[]>([]);
+  const [agents, setAgents] = useState<CustomsAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [activeView, setActiveView] = useState<"companies" | "agents">(
@@ -45,115 +48,199 @@ export default function CustomsManagement() {
   const [editingItem, setEditingItem] = useState<
     CustomsCompany | CustomsAgent | null
   >(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [formData, setFormData] = useState({
+    // For companies
+    name: "",
+    address: "",
+    phone: "",
+    email: "",
+    // For agents
+    position: "",
+    customsCompanyId: "",
+  });
 
-  // נתונים דמה
+  // 🔄 טעינת נתונים מה-API
   useEffect(() => {
-    setTimeout(() => {
-      setCompanies([
-        {
-          id: "1",
-          name: 'עמילות ישראל בע"מ',
-          address: "רחוב הרצל 15, תל אביב",
-          phone: "03-1234567",
-          email: "info@customs-israel.co.il",
-          contactName: "דוד כהן",
-          contactPosition: "מנהל כללי",
-          createdAt: "2025-01-15",
-          agents: [
-            {
-              id: "1",
-              name: "משה לוי",
-              phone: "050-1234567",
-              email: "moshe@customs-israel.co.il",
-              position: "עמיל בכיר",
-              customsCompanyId: "1",
-              createdAt: "2025-01-15",
-            },
-            {
-              id: "2",
-              name: "שרה אברהם",
-              phone: "052-2345678",
-              email: "sarah@customs-israel.co.il",
-              position: "עמילה",
-              customsCompanyId: "1",
-              createdAt: "2025-01-10",
-            },
-          ],
-        },
-        {
-          id: "2",
-          name: 'מכס וילונות בע"מ',
-          address: "שדרות רוטשילד 22, תל אביב",
-          phone: "03-9876543",
-          email: "office@maches-logistics.co.il",
-          contactName: "אבי רוזן",
-          contactPosition: "מנהל מכס",
-          createdAt: "2025-01-10",
-          agents: [
-            {
-              id: "3",
-              name: "יוסי דוד",
-              phone: "054-3456789",
-              email: "yossi@maches-logistics.co.il",
-              position: "עמיל ראשי",
-              customsCompanyId: "2",
-              createdAt: "2025-01-10",
-            },
-          ],
-        },
-        {
-          id: "3",
-          name: "אוניברסל לוגיסטיקס",
-          address: "האומן 45, חיפה",
-          phone: "04-8765432",
-          email: "contact@universal-log.co.il",
-          contactName: "רחל גולן",
-          contactPosition: "מנהלת תפעול",
-          createdAt: "2025-01-05",
-          agents: [
-            {
-              id: "4",
-              name: "עמי חדד",
-              phone: "053-4567890",
-              email: "ami@universal-log.co.il",
-              position: "עמיל",
-              customsCompanyId: "3",
-              createdAt: "2025-01-05",
-            },
-            {
-              id: "5",
-              name: "נועה ברק",
-              phone: "055-5678901",
-              email: "noa@universal-log.co.il",
-              position: "עמילה בכירה",
-              customsCompanyId: "3",
-              createdAt: "2025-01-01",
-            },
-          ],
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+    loadData();
   }, []);
 
-  const allAgents = companies.flatMap((company) =>
-    company.agents.map((agent) => ({
-      ...agent,
-      companyName: company.name,
-    }))
-  );
+  const loadData = async () => {
+    try {
+      setLoading(true);
+
+      // טוען חברות עמילות עם הסוכנים שלהם
+      const companiesResponse = await fetch("/api/customs/companies");
+      if (companiesResponse.ok) {
+        const companiesData = await companiesResponse.json();
+        setCompanies(companiesData);
+      }
+
+      // טוען כל הסוכנים עם שם החברה
+      const agentsResponse = await fetch("/api/customs/agents");
+      if (agentsResponse.ok) {
+        const agentsData = await agentsResponse.json();
+        setAgents(agentsData);
+      }
+    } catch (error) {
+      console.error("Error loading customs data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredCompanies = companies.filter(
     (company) =>
       company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.contactName.toLowerCase().includes(searchTerm.toLowerCase())
+      company.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredAgents = allAgents.filter(
+  const filteredAgents = agents.filter(
     (agent) =>
       agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.companyName.toLowerCase().includes(searchTerm.toLowerCase())
+      agent.customsCompany?.name
+        .toLowerCase()
+        .includes(searchTerm.toLowerCase()) ||
+      agent.position.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // 🆕 הוספת חברת עמילות
+  const handleAddCompany = async () => {
+    if (!formData.name.trim() || !formData.email.trim()) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/customs/companies", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          address: formData.address.trim(),
+          phone: formData.phone.trim(),
+          email: formData.email.trim(),
+        }),
+      });
+
+      if (response.ok) {
+        await loadData(); // טען מחדש את הנתונים
+        resetForm();
+        setShowAddModal(false);
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה בהוספת חברת עמילות");
+      }
+    } catch (error) {
+      console.error("Error adding company:", error);
+      alert("שגיאה בהוספת חברת עמילות");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 🆕 הוספת סוכן מכס
+  const handleAddAgent = async () => {
+    if (!formData.name.trim() || !formData.customsCompanyId) return;
+
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/customs/agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: formData.name.trim(),
+          phone: formData.phone.trim(),
+          position: formData.position.trim(),
+          customsCompanyId: formData.customsCompanyId,
+        }),
+      });
+
+      if (response.ok) {
+        await loadData(); // טען מחדש את הנתונים
+        resetForm();
+        setShowAddModal(false);
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה בהוספת סוכן מכס");
+      }
+    } catch (error) {
+      console.error("Error adding agent:", error);
+      alert("שגיאה בהוספת סוכן מכס");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // 🗑️ מחיקת חברת עמילות
+  const handleDeleteCompany = async (companyId: string) => {
+    const company = companies.find((c) => c.id === companyId);
+    if (!company) return;
+
+    if (company.agents.length > 0) {
+      alert(
+        `לא ניתן למחוק חברה עם ${company.agents.length} סוכנים. מחק את הסוכנים קודם.`
+      );
+      return;
+    }
+
+    if (!confirm(`האם אתה בטוח שברצונך למחוק את "${company.name}"?`)) return;
+
+    try {
+      const response = await fetch(`/api/customs/companies?id=${companyId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        await loadData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה במחיקת חברת עמילות");
+      }
+    } catch (error) {
+      console.error("Error deleting company:", error);
+      alert("שגיאה במחיקת חברת עמילות");
+    }
+  };
+
+  // 🗑️ מחיקת סוכן מכס
+  const handleDeleteAgent = async (agentId: string) => {
+    const agent = agents.find((a) => a.id === agentId);
+    if (!agent) return;
+
+    if (!confirm(`האם אתה בטוח שברצונך למחוק את "${agent.name}"?`)) return;
+
+    try {
+      const response = await fetch(`/api/customs/agents?id=${agentId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        await loadData();
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה במחיקת סוכן מכס");
+      }
+    } catch (error) {
+      console.error("Error deleting agent:", error);
+      alert("שגיאה במחיקת סוכן מכס");
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      address: "",
+      phone: "",
+      email: "",
+      position: "",
+      customsCompanyId: "",
+    });
+    setEditingItem(null);
+  };
+
+  const openAddModal = () => {
+    resetForm();
+    setShowAddModal(true);
+  };
 
   if (loading) {
     return (
@@ -173,16 +260,16 @@ export default function CustomsManagement() {
             ניהול עמילויות ומכס
           </h2>
           <p className="text-sm text-gray-600 mt-1">
-            ניהול חברות עמילות ועמילי מכס במערכת
+            ניהול חברות עמילות וסוכני מכס במערכת
           </p>
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
+          onClick={openAddModal}
           className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700"
         >
           <Plus className="h-4 w-4" />
-          <span>הוסף {activeView === "companies" ? "חברה" : "עמיל"}</span>
+          <span>הוסף {activeView === "companies" ? "חברה" : "סוכן"}</span>
         </button>
       </div>
 
@@ -206,7 +293,7 @@ export default function CustomsManagement() {
               : "text-gray-600 hover:text-gray-900"
           }`}
         >
-          עמילי מכס ({allAgents.length})
+          סוכני מכס ({agents.length})
         </button>
       </div>
 
@@ -216,7 +303,7 @@ export default function CustomsManagement() {
         <input
           type="text"
           placeholder={`חיפוש ${
-            activeView === "companies" ? "חברות" : "עמילים"
+            activeView === "companies" ? "חברות" : "סוכנים"
           }...`}
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -241,10 +328,11 @@ export default function CustomsManagement() {
                 </div>
 
                 <div className="flex items-center space-x-1">
-                  <button className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                  <button
+                    onClick={() => handleDeleteCompany(company.id)}
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                    title="מחק חברה"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -263,18 +351,12 @@ export default function CustomsManagement() {
                   <Mail className="h-4 w-4" />
                   <span>{company.email}</span>
                 </p>
-                <p className="flex items-center space-x-2">
-                  <User className="h-4 w-4" />
-                  <span>
-                    {company.contactName} - {company.contactPosition}
-                  </span>
-                </p>
               </div>
 
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-500">
-                    {company.agents.length} עמילים
+                    {company.agents.length} סוכנים
                   </span>
                   <span className="text-xs text-gray-400">
                     נוצר:{" "}
@@ -287,7 +369,7 @@ export default function CustomsManagement() {
         </div>
       )}
 
-      {/* תצוגת עמילים */}
+      {/* תצוגת סוכנים */}
       {activeView === "agents" && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredAgents.map((agent) => (
@@ -302,10 +384,11 @@ export default function CustomsManagement() {
                 </div>
 
                 <div className="flex items-center space-x-1">
-                  <button className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded">
-                    <Edit className="h-4 w-4" />
-                  </button>
-                  <button className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded">
+                  <button
+                    onClick={() => handleDeleteAgent(agent.id)}
+                    className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                    title="מחק סוכן"
+                  >
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
@@ -315,15 +398,11 @@ export default function CustomsManagement() {
                 <p>{agent.position}</p>
                 <p className="flex items-center space-x-2">
                   <Building2 className="h-3 w-3" />
-                  <span>{agent.companyName}</span>
+                  <span>{agent.customsCompany?.name}</span>
                 </p>
                 <p className="flex items-center space-x-2">
                   <Phone className="h-3 w-3" />
                   <span>{agent.phone}</span>
-                </p>
-                <p className="flex items-center space-x-2">
-                  <Mail className="h-3 w-3" />
-                  <span>{agent.email}</span>
                 </p>
               </div>
 
@@ -349,21 +428,169 @@ export default function CustomsManagement() {
           <p className="text-gray-500">
             {searchTerm
               ? `לא נמצאו ${
-                  activeView === "companies" ? "חברות" : "עמילים"
+                  activeView === "companies" ? "חברות" : "סוכנים"
                 } התואמים לחיפוש`
               : `אין ${
-                  activeView === "companies" ? "חברות עמילות" : "עמילי מכס"
+                  activeView === "companies" ? "חברות עמילות" : "סוכני מכס"
                 } במערכת`}
           </p>
           {!searchTerm && (
             <button
-              onClick={() => setShowAddModal(true)}
+              onClick={openAddModal}
               className="mt-2 text-blue-600 hover:text-blue-700"
             >
-              הוסף {activeView === "companies" ? "חברת עמילות" : "עמיל מכס"}{" "}
+              הוסף {activeView === "companies" ? "חברת עמילות" : "סוכן מכס"}{" "}
               ראשון
             </button>
           )}
+        </div>
+      )}
+
+      {/* מודל הוספה */}
+      {showAddModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold mb-4">
+              הוספת {activeView === "companies" ? "חברת עמילות" : "סוכן מכס"}{" "}
+              חדש
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  שם {activeView === "companies" ? "החברה" : "הסוכן"} *
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder={
+                    activeView === "companies" ? "שם חברת העמילות" : "שם הסוכן"
+                  }
+                  disabled={submitting}
+                />
+              </div>
+
+              {activeView === "companies" ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      כתובת
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.address}
+                      onChange={(e) =>
+                        setFormData({ ...formData, address: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="כתובת החברה"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      אימייל *
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) =>
+                        setFormData({ ...formData, email: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="email@company.com"
+                      disabled={submitting}
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      תפקיד
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.position}
+                      onChange={(e) =>
+                        setFormData({ ...formData, position: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="סוכן מכס, סוכן בכיר, וכו'"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      חברת עמילות *
+                    </label>
+                    <select
+                      value={formData.customsCompanyId}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          customsCompanyId: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      disabled={submitting}
+                    >
+                      <option value="">בחר חברת עמילות</option>
+                      {companies.map((company) => (
+                        <option key={company.id} value={company.id}>
+                          {company.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  טלפון
+                </label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, phone: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="מספר טלפון"
+                  disabled={submitting}
+                />
+              </div>
+            </div>
+
+            <div className="flex space-x-3 mt-6">
+              <button
+                onClick={
+                  activeView === "companies" ? handleAddCompany : handleAddAgent
+                }
+                disabled={
+                  submitting ||
+                  !formData.name.trim() ||
+                  (activeView === "companies" && !formData.email.trim()) ||
+                  (activeView === "agents" && !formData.customsCompanyId)
+                }
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {submitting ? "שומר..." : "הוסף"}
+              </button>
+              <button
+                onClick={() => setShowAddModal(false)}
+                disabled={submitting}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 disabled:opacity-50"
+              >
+                ביטול
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

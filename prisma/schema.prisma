@@ -31,6 +31,7 @@ model User {
   uploadedOrderFiles    OrderFile[]
   statusChanges         OrderStatusHistory[]
   auditLogs            AuditLog[]
+  systemSettings       SystemSetting[] 
 
   @@map("users")
 }
@@ -153,8 +154,10 @@ model Supplier {
   beneficiary          String?
   iban                 String?
   bic                  String?
+  connection            String?  @map("connection")
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
+  
 
   // יחסים
   orders             Order[]
@@ -335,3 +338,21 @@ model AuditLog {
   @@map("audit_log")
 }
 
+// טבלת הגדרות מערכת
+model SystemSetting {
+  id          String   @id @default(uuid())
+  key         String   @unique // "order_statuses", "currencies", "default_currency"
+  value       String   @db.Text // JSON string או plain text
+  type        String   // "json", "text", "number", "boolean"
+  category    String   // "general", "financial", "orders", "notifications"
+  description String?  // תיאור להגדרה
+  isEditable  Boolean  @default(true) // האם ניתן לעריכה
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  updatedBy   String?  @map("updated_by") // מי עדכן
+
+  // יחס למשתמש שעדכן (אופציונלי)
+  updater User? @relation(fields: [updatedBy], references: [id])
+
+  @@map("system_settings")
+}

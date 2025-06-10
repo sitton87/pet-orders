@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 interface AddSupplierModalProps {
   isOpen: boolean;
@@ -31,6 +31,15 @@ interface SupplierFormData {
   beneficiary: string;
   iban: string;
   bic: string;
+  // 🆕 שדות חדשים
+  categoryIds: string[];
+  connection: string;
+}
+
+interface ProductCategory {
+  id: string;
+  name: string;
+  description?: string;
 }
 
 export default function AddSupplierModal({
@@ -61,10 +70,33 @@ export default function AddSupplierModal({
     beneficiary: "",
     iban: "",
     bic: "",
+    // 🆕 שדות חדשים
+    categoryIds: [],
+    connection: "",
   });
 
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+
+  // 🆕 טעינת קטגוריות
+  useEffect(() => {
+    if (isOpen) {
+      loadCategories();
+    }
+  }, [isOpen]);
+
+  const loadCategories = async () => {
+    try {
+      const response = await fetch("/api/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
 
   const handleInputChange = (field: keyof SupplierFormData, value: any) => {
     setFormData((prev) => ({
@@ -76,43 +108,52 @@ export default function AddSupplierModal({
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
-      // כרגע נוסיף את הספק למערך הדמה
-      // בהמשך נחבר לדאטבייס
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // סימולציה
-
-      onAddSupplier({
-        id: Date.now().toString(),
-        ...formData,
+      // 🆕 שליחה לAPI עם קטגוריות
+      const response = await fetch("/api/suppliers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
       });
 
-      // איפוס הטופס
-      setFormData({
-        name: "",
-        country: "",
-        city: "",
-        address: "",
-        phone: "",
-        email: "",
-        contactPerson: "",
-        contactPhone: "",
-        contactPosition: "",
-        productionTimeWeeks: 1,
-        shippingTimeWeeks: 1,
-        hasAdvancePayment: false,
-        advancePercentage: 0,
-        currency: "USD",
-        importLicense: "",
-        licenseExpiry: "",
-        feedLicense: "",
-        feedLicenseExpiry: "",
-        bankName: "",
-        beneficiary: "",
-        iban: "",
-        bic: "",
-      });
+      if (response.ok) {
+        const newSupplier = await response.json();
+        onAddSupplier(newSupplier);
 
-      setCurrentStep(1);
-      onClose();
+        // איפוס הטופס
+        setFormData({
+          name: "",
+          country: "",
+          city: "",
+          address: "",
+          phone: "",
+          email: "",
+          contactPerson: "",
+          contactPhone: "",
+          contactPosition: "",
+          productionTimeWeeks: 1,
+          shippingTimeWeeks: 1,
+          hasAdvancePayment: false,
+          advancePercentage: 0,
+          currency: "USD",
+          importLicense: "",
+          licenseExpiry: "",
+          feedLicense: "",
+          feedLicenseExpiry: "",
+          bankName: "",
+          beneficiary: "",
+          iban: "",
+          bic: "",
+          categoryIds: [],
+          connection: "",
+        });
+
+        setCurrentStep(1);
+        onClose();
+      } else {
+        console.error("Error creating supplier");
+      }
     } catch (error) {
       console.error("שגיאה בהוספת ספק:", error);
     } finally {
@@ -317,13 +358,32 @@ export default function AddSupplierModal({
                     placeholder="תפקיד"
                   />
                 </div>
+
+                {/* 🆕 שדה חיבור/קישור */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    קישור/חיבור
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.connection}
+                    onChange={(e) =>
+                      handleInputChange("connection", e.target.value)
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="אתר אינטרנט, מייל, או טלפון נוסף"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    לדוגמה: https://supplier-website.com או support@supplier.com
+                  </p>
+                </div>
               </div>
             </div>
           )}
 
-          {/* שלב 3 - פרטי ייצור ותשלום */}
+          {/* שלב 3 - פרטי ייצור ותשלום + קטגוריות */}
           {currentStep === 3 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <h3 className="text-lg font-semibold mb-4">פרטי ייצור ותשלום</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -399,6 +459,63 @@ export default function AddSupplierModal({
                       placeholder="אחוז מקדמה"
                     />
                   </div>
+                )}
+              </div>
+
+              {/* 🆕 קטגוריות מוצרים */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  קטגוריות מוצרים
+                </label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+                  {categories.length > 0 ? (
+                    categories.map((category) => (
+                      <label
+                        key={category.id}
+                        className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={formData.categoryIds.includes(category.id)}
+                          onChange={(e) => {
+                            const categoryIds = [...formData.categoryIds];
+                            if (e.target.checked) {
+                              categoryIds.push(category.id);
+                            } else {
+                              const index = categoryIds.indexOf(category.id);
+                              if (index > -1) {
+                                categoryIds.splice(index, 1);
+                              }
+                            }
+                            handleInputChange("categoryIds", categoryIds);
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-900">
+                            {category.name}
+                          </span>
+                          {category.description && (
+                            <p className="text-xs text-gray-500">
+                              {category.description}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
+                      <p>אין קטגוריות זמינות.</p>
+                      <p className="text-xs mt-1">
+                        ניתן להוסיף קטגוריות בדף "ניהול נתונים"
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {formData.categoryIds.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    נבחרו {formData.categoryIds.length} קטגוריות
+                  </p>
                 )}
               </div>
             </div>

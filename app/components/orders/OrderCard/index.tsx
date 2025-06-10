@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+
 import {
   Calendar,
   DollarSign,
@@ -35,30 +36,87 @@ export default function OrderCard({
   const [showDetails, setShowDetails] = useState(false);
   const [showFiles, setShowFiles] = useState(false);
 
+  // 🆕 State לסטטוסים דינמיים
+  const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(order.status);
+
+  // 🔄 טעינת סטטוסים זמינים
+  useEffect(() => {
+    loadAvailableStatuses();
+  }, []);
+
+  const loadAvailableStatuses = async () => {
+    try {
+      const response = await fetch("/api/settings/statuses");
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableStatuses(data.statuses);
+      }
+    } catch (error) {
+      console.error("Error loading statuses:", error);
+      // סטטוסים ברירת מחדל במקרה של שגיאה
+      setAvailableStatuses([
+        "בתהליך הזמנה",
+        "בייצור",
+        "נשלח",
+        "בדרך",
+        "הגיע לנמל",
+        "הושלם",
+        "מבוטלת",
+      ]);
+    }
+  };
+
+  // 🔄 פונקציה לעדכון סטטוס
+  const updateOrderStatus = async (newStatus: string) => {
+    if (newStatus === currentStatus) return;
+
+    setIsUpdatingStatus(true);
+    try {
+      const response = await fetch(`/api/orders/${order.id}/status`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (response.ok) {
+        setCurrentStatus(newStatus);
+        // עדכון האובייקט המקומי
+        order.status = newStatus;
+      } else {
+        console.error("Failed to update status");
+        // החזרת הסטטוס הקודם במקרה של שגיאה
+        setCurrentStatus(order.status);
+      }
+    } catch (error) {
+      console.error("Error updating status:", error);
+      setCurrentStatus(order.status);
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
   const handleDelete = async () => {
     setShowDeleteConfirm(false);
     await onDelete(order.id);
   };
 
+  // 🎨 צבעים דינמיים לפי סדר הסטטוסים
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case "בתהליך הזמנה":
-        return "bg-yellow-100 text-yellow-800";
-      case "בייצור":
-        return "bg-blue-100 text-blue-800";
-      case "נשלח":
-        return "bg-purple-100 text-purple-800";
-      case "בדרך":
-        return "bg-indigo-100 text-indigo-800";
-      case "הגיע לנמל":
-        return "bg-orange-100 text-orange-800";
-      case "הושלם":
-        return "bg-green-100 text-green-800";
-      case "מבוטלת":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
+    const statusIndex = availableStatuses.indexOf(status);
+    const colors = [
+      "bg-yellow-100 text-yellow-800 border-yellow-200", // סטטוס ראשון
+      "bg-blue-100 text-blue-800 border-blue-200", // סטטוס שני
+      "bg-purple-100 text-purple-800 border-purple-200", // סטטוס שלישי
+      "bg-indigo-100 text-indigo-800 border-indigo-200", // סטטוס רביעי
+      "bg-orange-100 text-orange-800 border-orange-200", // סטטוס חמישי
+      "bg-green-100 text-green-800 border-green-200", // סטטוס שישי
+      "bg-red-100 text-red-800 border-red-200", // סטטוס שביעי
+      "bg-gray-100 text-gray-800 border-gray-200", // סטטוס לא מוכר
+    ];
+
+    return colors[statusIndex] || colors[7];
   };
 
   const formatCurrency = (amount: number, currency?: string) => {
@@ -71,9 +129,8 @@ export default function OrderCard({
   const isOverdue = () => {
     const etaDate = new Date(order.etaFinal);
     const today = new Date();
-    return (
-      etaDate < today && order.status !== "הושלם" && order.status !== "מבוטלת"
-    );
+    const completedStatuses = ["הושלם", "מבוטלת"];
+    return etaDate < today && !completedStatuses.includes(currentStatus);
   };
 
   return (
@@ -90,13 +147,35 @@ export default function OrderCard({
               <h3 className="text-lg font-semibold text-gray-900">
                 {order.orderNumber}
               </h3>
-              <span
-                className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(
-                  order.status
-                )}`}
-              >
-                {order.status}
-              </span>
+
+              {/* 🆕 Dropdown לעדכון סטטוס */}
+              <div className="relative">
+                <select
+                  value={currentStatus}
+                  onChange={(e) => updateOrderStatus(e.target.value)}
+                  disabled={isUpdatingStatus}
+                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border cursor-pointer 
+                    ${getStatusColor(currentStatus)} 
+                    ${
+                      isUpdatingStatus
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:shadow-sm"
+                    }
+                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1`}
+                >
+                  {availableStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                {isUpdatingStatus && (
+                  <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+                  </div>
+                )}
+              </div>
+
               {isOverdue() && (
                 <div className="flex items-center text-red-600">
                   <AlertTriangle className="h-4 w-4 mr-1" />
@@ -139,7 +218,7 @@ export default function OrderCard({
             <button
               onClick={() => onViewGantt(order.id)}
               className="p-2 text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
-              title="צפה בגאנט"
+              title="צפה בלוח שנה"
             >
               <Eye className="h-4 w-4" />
             </button>

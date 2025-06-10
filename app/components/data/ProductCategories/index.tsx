@@ -10,7 +10,8 @@ interface ProductCategory {
   createdAt: string;
   updatedAt: string;
   _count?: {
-    orders: number;
+    supplierCategories?: number;
+    orderCategories?: number;
   };
 }
 
@@ -22,55 +23,29 @@ export default function ProductCategories() {
   const [editingCategory, setEditingCategory] =
     useState<ProductCategory | null>(null);
   const [newCategory, setNewCategory] = useState({ name: "", description: "" });
+  const [submitting, setSubmitting] = useState(false);
 
-  // נתונים דמה לעת עתה - נחליף ב-API אמיתי אחר כך
+  // 🔄 טעינת קטגוריות מה-API האמיתי
   useEffect(() => {
-    setTimeout(() => {
-      setCategories([
-        {
-          id: "1",
-          name: "צעצועים",
-          description: "צעצועים לכלבים וחתולים",
-          createdAt: "2025-01-15",
-          updatedAt: "2025-01-15",
-          _count: { orders: 12 },
-        },
-        {
-          id: "2",
-          name: "מיטות וכריות",
-          description: "מיטות, כריות וציוד שינה",
-          createdAt: "2025-01-10",
-          updatedAt: "2025-01-10",
-          _count: { orders: 8 },
-        },
-        {
-          id: "3",
-          name: "קערות ושתייה",
-          description: "קערות אוכל ומים, מתקני שתייה",
-          createdAt: "2025-01-08",
-          updatedAt: "2025-01-08",
-          _count: { orders: 15 },
-        },
-        {
-          id: "4",
-          name: "רתמות ורצועות",
-          description: "ציוד הליכה וביטחון",
-          createdAt: "2025-01-05",
-          updatedAt: "2025-01-05",
-          _count: { orders: 6 },
-        },
-        {
-          id: "5",
-          name: "מזון וחטיפים",
-          description: "מזון יבש, רטוב וחטיפים",
-          createdAt: "2025-01-01",
-          updatedAt: "2025-01-01",
-          _count: { orders: 22 },
-        },
-      ]);
-      setLoading(false);
-    }, 1000);
+    loadCategories();
   }, []);
+
+  const loadCategories = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch("/api/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      } else {
+        console.error("Error fetching categories");
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredCategories = categories.filter(
     (category) =>
@@ -78,21 +53,38 @@ export default function ProductCategories() {
       category.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleAddCategory = () => {
+  // 🆕 הוספת קטגוריה חדשה
+  const handleAddCategory = async () => {
     if (!newCategory.name.trim()) return;
 
-    const category: ProductCategory = {
-      id: Date.now().toString(),
-      name: newCategory.name,
-      description: newCategory.description,
-      createdAt: new Date().toISOString().split("T")[0],
-      updatedAt: new Date().toISOString().split("T")[0],
-      _count: { orders: 0 },
-    };
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: newCategory.name.trim(),
+          description: newCategory.description.trim() || null,
+        }),
+      });
 
-    setCategories([category, ...categories]);
-    setNewCategory({ name: "", description: "" });
-    setShowAddModal(false);
+      if (response.ok) {
+        const addedCategory = await response.json();
+        setCategories([addedCategory, ...categories]);
+        setNewCategory({ name: "", description: "" });
+        setShowAddModal(false);
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה בהוספת קטגוריה");
+      }
+    } catch (error) {
+      console.error("Error adding category:", error);
+      alert("שגיאה בהוספת קטגוריה");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEditCategory = (category: ProductCategory) => {
@@ -103,37 +95,81 @@ export default function ProductCategories() {
     });
   };
 
-  const handleUpdateCategory = () => {
+  // 🔄 עדכון קטגוריה
+  const handleUpdateCategory = async () => {
     if (!editingCategory || !newCategory.name.trim()) return;
 
-    setCategories(
-      categories.map((cat) =>
-        cat.id === editingCategory.id
-          ? {
-              ...cat,
-              name: newCategory.name,
-              description: newCategory.description,
-              updatedAt: new Date().toISOString().split("T")[0],
-            }
-          : cat
-      )
-    );
+    setSubmitting(true);
+    try {
+      const response = await fetch("/api/categories", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: editingCategory.id,
+          name: newCategory.name.trim(),
+          description: newCategory.description.trim() || null,
+        }),
+      });
 
-    setEditingCategory(null);
-    setNewCategory({ name: "", description: "" });
+      if (response.ok) {
+        const updatedCategory = await response.json();
+        setCategories(
+          categories.map((cat) =>
+            cat.id === editingCategory.id ? updatedCategory : cat
+          )
+        );
+        setEditingCategory(null);
+        setNewCategory({ name: "", description: "" });
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה בעדכון קטגוריה");
+      }
+    } catch (error) {
+      console.error("Error updating category:", error);
+      alert("שגיאה בעדכון קטגוריה");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const handleDeleteCategory = (categoryId: string) => {
+  // 🗑️ מחיקת קטגוריה
+  const handleDeleteCategory = async (categoryId: string) => {
     const category = categories.find((c) => c.id === categoryId);
-    if (category && category._count?.orders && category._count.orders > 0) {
+    if (!category) return;
+
+    // בדיקה אם יש ספקים או הזמנות מקושרות
+    const totalUsage =
+      (category._count?.supplierCategories || 0) +
+      (category._count?.orderCategories || 0);
+    if (totalUsage > 0) {
       alert(
-        `לא ניתן למחוק קטגוריה עם ${category._count.orders} הזמנות מקושרות`
+        `לא ניתן למחוק קטגוריה זו - היא בשימוש על ידי ${totalUsage} ספקים/הזמנות`
       );
       return;
     }
 
-    if (confirm("האם אתה בטוח שברצונך למחוק קטגוריה זו?")) {
-      setCategories(categories.filter((cat) => cat.id !== categoryId));
+    if (
+      !confirm(`האם אתה בטוח שברצונך למחוק את הקטגוריה "${category.name}"?`)
+    ) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/categories?id=${categoryId}`, {
+        method: "DELETE",
+      });
+
+      if (response.ok) {
+        setCategories(categories.filter((cat) => cat.id !== categoryId));
+      } else {
+        const error = await response.json();
+        alert(error.error || "שגיאה במחיקת קטגוריה");
+      }
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      alert("שגיאה במחיקת קטגוריה");
     }
   };
 
@@ -197,12 +233,14 @@ export default function ProductCategories() {
                 <button
                   onClick={() => handleEditCategory(category)}
                   className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                  title="ערוך קטגוריה"
                 >
                   <Edit className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDeleteCategory(category.id)}
                   className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded"
+                  title="מחק קטגוריה"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -216,7 +254,11 @@ export default function ProductCategories() {
             )}
 
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>{category._count?.orders || 0} הזמנות</span>
+              <span>
+                {(category._count?.supplierCategories || 0) +
+                  (category._count?.orderCategories || 0)}{" "}
+                שימושים
+              </span>
               <span>
                 עודכן:{" "}
                 {new Date(category.updatedAt).toLocaleDateString("he-IL")}
@@ -266,6 +308,7 @@ export default function ProductCategories() {
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="לדוגמה: צעצועים"
+                  disabled={submitting}
                 />
               </div>
 
@@ -284,6 +327,7 @@ export default function ProductCategories() {
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="תיאור הקטגוריה..."
+                  disabled={submitting}
                 />
               </div>
             </div>
@@ -293,10 +337,10 @@ export default function ProductCategories() {
                 onClick={
                   editingCategory ? handleUpdateCategory : handleAddCategory
                 }
-                disabled={!newCategory.name.trim()}
-                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50"
+                disabled={!newCategory.name.trim() || submitting}
+                className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {editingCategory ? "עדכן" : "הוסף"}
+                {submitting ? "שומר..." : editingCategory ? "עדכן" : "הוסף"}
               </button>
               <button
                 onClick={() => {
@@ -304,7 +348,8 @@ export default function ProductCategories() {
                   setEditingCategory(null);
                   setNewCategory({ name: "", description: "" });
                 }}
-                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400"
+                disabled={submitting}
+                className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 disabled:opacity-50"
               >
                 ביטול
               </button>
