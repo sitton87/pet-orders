@@ -7,7 +7,10 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get("type");
 
     if (!type || !["suppliers", "orders", "categories"].includes(type)) {
-      return NextResponse.json({ error: "סוג תבנית לא תקין" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Invalid template type" },
+        { status: 400 }
+      );
     }
 
     const workbook = XLSX.utils.book_new();
@@ -34,27 +37,63 @@ export async function GET(request: NextRequest) {
           "מטבע",
         ],
 
-        // שורה 2: הוראות ודרישות
+        // שורה 2: סוג הנתונים
         [
-          "הוראות: מלא נתונים החל משורה 4. שדות חובה: שם הספק, מדינה. תשלום מקדמה: כן/לא",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
+          "טקסט חופשי",
+          "טקסט חופשי",
+          "טקסט חופשי",
+          "טקסט חופשי",
+          "טלפון",
+          "אימייל",
+          "טקסט חופשי",
+          "טלפון",
+          "טקסט חופשי",
+          "מספר",
+          "מספר",
+          "כן/לא",
+          "מספר",
+          "USD/EUR/GBP/CNY/ILS",
         ],
 
-        // שורה 3: דוגמה למחיקה
+        // שורה 3: חובה/אופציונלי
         [
-          "דוגמה - מחק שורה זו",
+          "חובה",
+          "חובה",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+        ],
+
+        // שורה 4: כותרות עמודות (שוב)
+        [
+          "שם הספק",
+          "מדינה",
+          "עיר",
+          "כתובת",
+          "טלפון",
+          "אימייל",
+          "איש קשר",
+          "טלפון איש קשר",
+          "תפקיד איש קשר",
+          "זמן ייצור (שבועות)",
+          "זמן שילוח (שבועות)",
+          "תשלום מקדמה",
+          "אחוז מקדמה",
+          "מטבע",
+        ],
+
+        // שורה 5: דוגמה
+        [
+          "ספק לדוגמה",
           "סין",
           "שנגחאי",
           "123 רחוב התעשייה",
@@ -91,25 +130,57 @@ export async function GET(request: NextRequest) {
           "מטבע מקורי",
         ],
 
-        // שורה 2: הוראות ודרישות
+        // שורה 2: סוג הנתונים
         [
-          "הוראות: מלא נתונים החל משורה 4. שדות חובה: מספר הזמנה, שם ספק. תאריך: YYYY-MM-DD",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
-          "",
+          "טקסט חופשי",
+          "טקסט חופשי",
+          "תאריך (dd/mm/yyyy)",
+          "טקסט חופשי",
+          "מספר",
+          "מספר",
+          "מספר",
+          "מספר",
+          "טקסט חופשי",
+          "טקסט חופשי",
+          "מספר",
+          "USD/EUR/GBP/CNY/ILS",
         ],
 
-        // שורה 3: דוגמה למחיקה
+        // שורה 3: חובה/אופציונלי
         [
-          "דוגמה - מחק שורה זו",
+          "חובה",
+          "חובה",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+          "אופציונלי",
+        ],
+
+        // שורה 4: כותרות עמודות (שוב)
+        [
+          "מספר הזמנה",
+          "שם ספק",
+          "תאריך ETA",
+          "סטטוס",
+          "סכום כולל",
+          "סכום מקדמה",
+          "תשלום סופי",
+          "שער חליפין",
+          "מספר קונטיינר",
+          "הערות",
+          "עלות שחרור נמל",
+          "מטבע מקורי",
+        ],
+
+        // שורה 5: דוגמה
+        [
+          "ORD-2025-001",
           'ספק לדוגמה בע"מ',
           "2025-03-15",
           "PENDING",
@@ -131,20 +202,25 @@ export async function GET(request: NextRequest) {
         // שורה 1: כותרות עמודות
         ["שם קטגוריה", "תיאור"],
 
-        // שורה 2: הוראות ודרישות
-        ["הוראות: מלא נתונים החל משורה 4. שדות חובה: שם קטגוריה", ""],
+        // שורה 2: סוג הנתונים
+        ["טקסט חופשי", "טקסט חופשי"],
 
-        // שורה 3: דוגמה למחיקה
-        ["דוגמה - מחק שורה זו", "צעצועים וכדורים לכלבים"],
+        // שורה 3: חובה/אופציונלי
+        ["חובה", "אופציונלי"],
+
+        // שורה 4: כותרות עמודות (שוב)
+        ["שם קטגוריה", "תיאור"],
+
+        // שורה 5: דוגמה
+        ["צעצועים לכלבים", "צעצועים וכדורים לכלבים"],
       ];
 
       worksheet = XLSX.utils.aoa_to_sheet(data);
       filename = "categories_template.xlsx";
     }
 
-    XLSX.utils.book_append_sheet(workbook, worksheet!, "Sheet1");
+    XLSX.utils.book_append_sheet(workbook, worksheet!, "Template");
 
-    // שימוש ב-buffer type עם encoding מפורש
     const buffer = XLSX.write(workbook, {
       type: "buffer",
       bookType: "xlsx",
@@ -154,14 +230,15 @@ export async function GET(request: NextRequest) {
       headers: {
         "Content-Type":
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(
-          filename
-        )}`,
+        "Content-Disposition": `attachment; filename="${filename}"`,
         "Content-Length": buffer.length.toString(),
       },
     });
   } catch (error) {
-    console.error("שגיאה ביצירת תבנית:", error);
-    return NextResponse.json({ error: "שגיאה ביצירת תבנית" }, { status: 500 });
+    console.error("Template creation error:", error);
+    return NextResponse.json(
+      { error: "Template creation failed" },
+      { status: 500 }
+    );
   }
 }

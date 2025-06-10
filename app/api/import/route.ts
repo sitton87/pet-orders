@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
 
     // המרה לJSON - מתחיל משורה 3 (כולל דוגמה)
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      range: 2, // מתחיל משורה 3 (אינדקס 2)
+      range: 4, // מתחיל משורה 5 (אחרי 4 שורות המידע)
       defval: null,
     });
 
