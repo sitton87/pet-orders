@@ -133,10 +133,10 @@ model Supplier {
   id                   String   @id @default(uuid())
   name                 String
   country              String
-  city                 String
+  city                 String?
   address              String?
   phone                String?
-  email                String
+  email                String?
   contactPerson        String?  @map("contact_person")
   contactPhone         String?  @map("contact_phone")
   contactPosition      String?  @map("contact_position")
