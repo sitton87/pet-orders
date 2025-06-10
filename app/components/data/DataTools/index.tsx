@@ -25,12 +25,8 @@ export default function DataTools() {
 
   const handleDownloadTemplate = async (type: string) => {
     try {
-      const response = await fetch("/api/import-template", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ type }),
+      const response = await fetch(`/api/import-template?type=${type}`, {
+        method: "GET",
       });
 
       if (!response.ok) {
