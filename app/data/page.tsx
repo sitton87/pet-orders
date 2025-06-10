@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Navbar from "@/components/layout/Navbar";
 import { Database, Package, Building2, Settings, FileText } from "lucide-react";
-import SeedDataButton from "@/components/dev/SeedDataButton";
 
 // Import tab components
 import ProductCategories from "@/components/data/ProductCategories";
@@ -70,7 +69,6 @@ export default function DataPage() {
       <Navbar />
 
       <div className="w-full px-4 py-8 mt-16">
-        {" "}
         {/* כותרת העמוד */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-4">
@@ -81,8 +79,7 @@ export default function DataPage() {
             ניהול קטגוריות, עמילויות, הגדרות מערכת וכלי נתונים
           </p>
         </div>
-        {/* כפתור נתונים לדוגמה */}
-        <SeedDataButton />
+
         {/* טאבים */}
         <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
           {/* Tab Navigation */}
