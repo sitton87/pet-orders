@@ -16,13 +16,21 @@ interface Currency {
   symbol: string;
 }
 
+interface ProductCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export default function EditSupplierModal({
   isOpen,
   onClose,
   onEditSupplier,
   supplier,
 }: EditSupplierModalProps) {
-  const [formData, setFormData] = useState<Supplier>({
+  const [formData, setFormData] = useState<
+    Supplier & { categoryIds: string[] }
+  >({
     id: "",
     name: "",
     country: "",
@@ -52,6 +60,7 @@ export default function EditSupplierModal({
     notes: "",
     paymentTerms: "",
     minimumOrder: 0,
+    categoryIds: [], // ✨ הוסף שדה קטגוריות
   });
 
   const [currentStep, setCurrentStep] = useState(1);
@@ -59,12 +68,18 @@ export default function EditSupplierModal({
   const [availableCurrencies, setAvailableCurrencies] = useState<Currency[]>(
     []
   );
+  const [categories, setCategories] = useState<ProductCategory[]>([]); // ✨ State לקטגוריות
 
   // טעינת נתוני הספק כשהmodal נפתח
   useEffect(() => {
     if (supplier && isOpen) {
+      // ✨ המרה של קטגוריות הספק לרשימת IDs
+      const categoryIds =
+        supplier.supplierCategories?.map((sc) => sc.category.id) || [];
+
       setFormData({
         ...supplier,
+        categoryIds, // ✨ הוסף קטגוריות
         // וודא שהתאריכים מוצגים נכון
         licenseExpiry: supplier.licenseExpiry
           ? supplier.licenseExpiry.split("T")[0]
@@ -75,6 +90,7 @@ export default function EditSupplierModal({
       });
       setCurrentStep(1);
       loadAvailableCurrencies();
+      loadCategories(); // ✨ טען קטגוריות
     }
   }, [supplier, isOpen]);
 
@@ -98,7 +114,23 @@ export default function EditSupplierModal({
     }
   };
 
-  const handleInputChange = (field: keyof Supplier, value: any) => {
+  // ✨ פונקציה לטעינת קטגוריות
+  const loadCategories = async () => {
+    try {
+      const response = await fetch("/api/categories");
+      if (response.ok) {
+        const data = await response.json();
+        setCategories(data);
+      }
+    } catch (error) {
+      console.error("Error loading categories:", error);
+    }
+  };
+
+  const handleInputChange = (
+    field: keyof (Supplier & { categoryIds: string[] }),
+    value: any
+  ) => {
     setFormData((prev) => ({
       ...prev,
       [field]: value,
@@ -110,10 +142,22 @@ export default function EditSupplierModal({
 
     setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // סימולציה
+      // ✨ שלח גם את הקטגוריות
+      const response = await fetch(`/api/suppliers/${supplier.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
 
-      onEditSupplier(supplier.id, formData);
-      onClose();
+      if (response.ok) {
+        const updatedSupplier = await response.json();
+        onEditSupplier(supplier.id, updatedSupplier);
+        onClose();
+      } else {
+        console.error("Error updating supplier");
+      }
     } catch (error) {
       console.error("שגיאה בעדכון ספק:", error);
     } finally {
@@ -353,9 +397,9 @@ export default function EditSupplierModal({
             </div>
           )}
 
-          {/* שלב 3 - פרטי ייצור ותשלום */}
+          {/* שלב 3 - פרטי ייצור ותשלום + קטגוריות */}
           {currentStep === 3 && (
-            <div className="space-y-4">
+            <div className="space-y-6">
               <h3 className="text-lg font-semibold mb-4">פרטי ייצור ותשלום</h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -431,6 +475,67 @@ export default function EditSupplierModal({
                       placeholder="אחוז מקדמה"
                     />
                   </div>
+                )}
+              </div>
+
+              {/* ✨ קטגוריות מוצרים */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  קטגוריות מוצרים
+                </label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-200 rounded-md p-3">
+                  {categories.length > 0 ? (
+                    categories.map((category) => (
+                      <label
+                        key={category.id}
+                        className="flex items-start space-x-3 cursor-pointer hover:bg-gray-50 p-2 rounded"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={
+                            formData.categoryIds?.includes(category.id) || false
+                          }
+                          onChange={(e) => {
+                            const categoryIds = [
+                              ...(formData.categoryIds || []),
+                            ];
+                            if (e.target.checked) {
+                              categoryIds.push(category.id);
+                            } else {
+                              const index = categoryIds.indexOf(category.id);
+                              if (index > -1) {
+                                categoryIds.splice(index, 1);
+                              }
+                            }
+                            handleInputChange("categoryIds", categoryIds);
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-0.5"
+                        />
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-900">
+                            {category.name}
+                          </span>
+                          {category.description && (
+                            <p className="text-xs text-gray-500">
+                              {category.description}
+                            </p>
+                          )}
+                        </div>
+                      </label>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-500 p-3 bg-gray-50 rounded-md">
+                      <p>אין קטגוריות זמינות.</p>
+                      <p className="text-xs mt-1">
+                        ניתן להוסיף קטגוריות בדף "ניהול נתונים"
+                      </p>
+                    </div>
+                  )}
+                </div>
+                {formData.categoryIds && formData.categoryIds.length > 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    נבחרו {formData.categoryIds.length} קטגוריות
+                  </p>
                 )}
               </div>
             </div>
