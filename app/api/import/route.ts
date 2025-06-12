@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const worksheet = workbook.Sheets[workbook.SheetNames[0]];
 
     const jsonData = XLSX.utils.sheet_to_json(worksheet, {
-      range: 3, // מתחיל משורה 4 (אחרי 3 שורות המידע)
+      header: 1, // קבל מערך של מערכים
       defval: null,
     });
 
@@ -32,20 +32,68 @@ export async function POST(request: NextRequest) {
     let updated = 0;
     let skipped = 0;
 
+    console.log("Raw Excel data:", jsonData);
+
+    // מערך הכותרות (שורה ראשונה)
+    const headers = jsonData[0] as string[];
+    console.log("Headers:", headers);
+
+    // הנתונים (משורה 4 ואילך - דילוג על 3 שורות הראשונות)
+    const dataRows = jsonData.slice(3); // משורה 4
+    console.log("Data rows:", dataRows);
+
     if (type === "suppliers") {
-      for (const row of jsonData as any[]) {
+      for (const [index, rawRow] of dataRows.entries()) {
         try {
+          const rowArray = rawRow as any[];
+
+          // המר מערך לאובייקט עם הכותרות
+          const row: Record<string, any> = {};
+          headers.forEach((header, i) => {
+            if (header) {
+              row[header] = rowArray[i];
+            }
+          });
+
+          console.log(`Processing row ${index + 1}:`, row);
+
           // דילוג על שורת הדוגמה
           if (row["שם הספק"] && row["שם הספק"].toString().includes("דוגמה")) {
+            console.log(`Skipped row ${index + 1}: Contains example`);
             skipped++;
             continue;
           }
 
-          // וידוא שיש שם וארץ (שדות חובה)
+          // בדיקה מפורטת של שדות חובה
+          console.log("Checking required fields:");
+          console.log("- שם הספק:", row["שם הספק"]);
+          console.log("- מדינה:", row["מדינה"]);
+          console.log("- עיר:", row["עיר"]);
+          console.log("- אימייל:", row["אימייל"]);
+
+          // וידוא שיש שדות חובה בסיסיים
           if (!row["שם הספק"] || !row["מדינה"]) {
+            console.log(`Skipped row ${index + 1}: Missing required fields`);
             skipped++;
             continue;
           }
+
+          // המרת תאריכים
+          const parseDate = (dateStr: any) => {
+            if (!dateStr) return null;
+            try {
+              if (typeof dateStr === "number") {
+                const excelEpoch = new Date(1900, 0, 1);
+                const excelDate = new Date(
+                  excelEpoch.getTime() + (dateStr - 2) * 24 * 60 * 60 * 1000
+                );
+                return excelDate.toISOString().split("T")[0];
+              }
+              return new Date(dateStr).toISOString().split("T")[0];
+            } catch {
+              return null;
+            }
+          };
 
           const supplierData = {
             name: row["שם הספק"],
@@ -58,14 +106,28 @@ export async function POST(request: NextRequest) {
             contactPhone: row["טלפון איש קשר"] || null,
             contactPosition: row["תפקיד איש קשר"] || null,
             productionTimeWeeks: parseInt(row["זמן ייצור (שבועות)"]) || 1,
-            shippingTimeWeeks: parseInt(row["זמן שילוח (שבועות)"]) || 1,
-            hasAdvancePayment:
-              row["תשלום מקדמה"] === "כן" || row["תשלום מקדמה"] === "TRUE",
-            advancePercentage: parseInt(row["אחוז מקדמה"]) || 0,
+            shippingTimeWeeks: parseInt(row["זמן משלוח (שבועות)"]) || 1,
             currency: row["מטבע"] || "USD",
+            hasAdvancePayment:
+              row["יש מקדמה"] === "כן" ||
+              row["יש מקדמה"] === "TRUE" ||
+              row["יש מקדמה"] === true,
+            advancePercentage: parseInt(row["אחוז מקדמה"]) || null,
+            paymentTerms: row["תנאי תשלום"] || null,
+            importLicense: row["רישיון ייבוא"] || null,
+            licenseExpiry: parseDate(row["תוקף רישיון"]),
+            feedLicense: row["רישיון מספוא"] || null,
+            feedLicenseExpiry: parseDate(row["תוקף מספוא"]),
+            bankName: row["בנק"] || null,
+            beneficiary: row["מוטב"] || null,
+            iban: row["IBAN"] || null,
+            bic: row["BIC"] || null,
+            connection: row["קישור/חיבור"] || null,
           };
 
-          // בדיקה אם הספק כבר קיים (לפי שם ומדינה)
+          console.log("Supplier data to save:", supplierData);
+
+          // בדיקה אם הספק כבר קיים
           const existingSupplier = await prisma.supplier.findFirst({
             where: {
               name: supplierData.name,
@@ -74,21 +136,21 @@ export async function POST(request: NextRequest) {
           });
 
           if (existingSupplier) {
-            // עדכון ספק קיים
+            console.log(`Updating existing supplier: ${supplierData.name}`);
             await prisma.supplier.update({
               where: { id: existingSupplier.id },
               data: supplierData,
             });
             updated++;
           } else {
-            // יצירת ספק חדש
+            console.log(`Creating new supplier: ${supplierData.name}`);
             await prisma.supplier.create({
               data: supplierData,
             });
             added++;
           }
         } catch (error) {
-          console.error("Error processing supplier row:", error);
+          console.error(`Error processing supplier row ${index + 1}:`, error);
           skipped++;
         }
       }
