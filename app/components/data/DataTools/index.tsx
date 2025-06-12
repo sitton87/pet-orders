@@ -41,7 +41,69 @@ export default function DataTools() {
     dataSize: "טוען...",
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  // State for recent activities - תיקון טיפוסי נתונים
+  const [recentActivities, setRecentActivities] = useState<
+    Array<{
+      action: string;
+      time: string;
+      status: string;
+      icon: React.ComponentType<{ className?: string }>; // תיקון הטיפוס
+    }>
+  >([]);
 
+  // Add activity to recent activities list
+  const addActivity = (
+    action: string,
+    status: "success" | "error" = "success"
+  ) => {
+    const now = new Date();
+    const timeString = now.toLocaleTimeString("he-IL", {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    const dateString =
+      now.toLocaleDateString("he-IL") === new Date().toLocaleDateString("he-IL")
+        ? "היום"
+        : now.toLocaleDateString("he-IL");
+
+    const newActivity = {
+      action,
+      time: `${dateString} ${timeString}`,
+      status,
+      icon: status === "success" ? CheckCircle : AlertTriangle, // אלה קומפוננטים תקינים
+    };
+
+    setRecentActivities((prev) => [newActivity, ...prev.slice(0, 4)]); // Keep only 5 latest
+
+    // Save to localStorage for persistence
+    const savedActivities = [newActivity, ...recentActivities.slice(0, 4)];
+    localStorage.setItem(
+      "recentActivities",
+      JSON.stringify(
+        savedActivities.map((activity) => ({
+          ...activity,
+          icon: activity.icon === CheckCircle ? "CheckCircle" : "AlertTriangle", // שמור כטקסט
+        }))
+      )
+    );
+  };
+
+  // Load activities from localStorage on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("recentActivities");
+    if (saved) {
+      try {
+        const activities = JSON.parse(saved);
+        const loadedActivities = activities.map((activity: any) => ({
+          ...activity,
+          icon: activity.icon === "CheckCircle" ? CheckCircle : AlertTriangle, // המר חזרה לקומפוננט
+        }));
+        setRecentActivities(loadedActivities);
+      } catch (error) {
+        console.error("Error loading activities:", error);
+      }
+    }
+  }, []);
   const [selectedFiles, setSelectedFiles] = useState<{
     [key: string]: File | null;
   }>({});
@@ -183,9 +245,19 @@ export default function DataTools() {
             : "קטגוריות"
         } הורדה בהצלחה!`
       );
+      addActivity(
+        `הורדת תבנית ${
+          type === "suppliers"
+            ? "ספקים"
+            : type === "orders"
+            ? "הזמנות"
+            : "קטגוריות"
+        }`
+      );
     } catch (error) {
       console.error("Template download error:", error);
       alert("שגיאה בהורדת תבנית");
+      addActivity("הורדת תבנית", "error");
     }
   };
 
@@ -243,11 +315,11 @@ export default function DataTools() {
       window.URL.revokeObjectURL(url);
 
       alert(`${type} יוצאו בהצלחה!`);
+      addActivity(`ייצוא ${type}`);
     } catch (error) {
-      console.error("Export error:", error);
+      console.error("Error:", error);
       alert("שגיאה בייצוא נתונים");
-    } finally {
-      setIsExporting(false);
+      addActivity(`ייצוא ${type}`, "error");
     }
   };
 
@@ -294,6 +366,9 @@ export default function DataTools() {
 
       // Refresh statistics after import
       loadStats();
+      addActivity(
+        `ייבוא ${importType} - נוספו: ${result.added}, עודכנו: ${result.updated}`
+      );
 
       // Reset file selection
       setSelectedFiles((prev) => ({
@@ -313,8 +388,7 @@ export default function DataTools() {
       const errorMessage =
         error instanceof Error ? error.message : "שגיאה לא ידועה";
       alert("שגיאה בייבוא נתונים: " + errorMessage);
-    } finally {
-      setIsImporting(false);
+      addActivity(`ייבוא נתונים`, "error");
     }
   };
 
@@ -352,9 +426,11 @@ export default function DataTools() {
       setDataStats((prev) => ({ ...prev, lastBackup: backupDate }));
 
       alert("גיבוי נוצר והורד בהצלחה!");
+      addActivity("יצירת גיבוי מערכת");
     } catch (error) {
       console.error("Backup error:", error);
       alert("שגיאה ביצירת גיבוי");
+      addActivity("יצירת גיבוי מערכת", "error");
     } finally {
       setIsBackingUp(false);
     }
@@ -392,9 +468,11 @@ export default function DataTools() {
 
         // Refresh statistics after cleanup
         loadStats();
+        addActivity(`ניקוי הזמנות ישנות - נמחקו: ${result.deletedCount || 0}`);
       } catch (error) {
         console.error("Cleanup error:", error);
         alert("שגיאה בניקוי נתונים");
+        addActivity("ניקוי הזמנות ישנות", "error");
       } finally {
         setIsCleaning(false);
       }
@@ -424,9 +502,13 @@ export default function DataTools() {
           result.deletedCount || 0
         } קבצי לוג ישנים.`
       );
+      addActivity(
+        `ניקוי לוגי DEBUG - נמחקו: ${result.deletedCount || 0} קבצים`
+      );
     } catch (error) {
-      console.error("Log cleanup error:", error);
-      alert("שגיאה בניקוי לוגים");
+      console.error("Error:", error);
+      alert("שגיאה בניקוי לוגים...");
+      addActivity("ניקוי לוגי DEBUG", "error");
     }
   };
 
@@ -450,9 +532,13 @@ export default function DataTools() {
       alert(
         `ניקוי קבצים זמניים הושלם! נמחקו ${result.deletedCount || 0} קבצים.`
       );
+      addActivity(
+        `ניקוי קבצים זמניים - נמחקו: ${result.deletedCount || 0} קבצים`
+      );
     } catch (error) {
-      console.error("Temp files cleanup error:", error);
-      alert("שגיאה בניקוי קבצים זמניים");
+      console.error("Error:", error);
+      alert("שגיאה בניקוי קבצים זמניים...");
+      addActivity("ניקוי קבצים זמניים", "error");
     }
   };
 
@@ -799,52 +885,34 @@ export default function DataTools() {
         </h3>
 
         <div className="space-y-3">
-          {[
-            {
-              action: "ייצוא ספקים",
-              time: "היום 14:30",
-              status: "success",
-              icon: CheckCircle,
-            },
-            {
-              action: "גיבוי מערכת",
-              time: "אתמול 22:00",
-              status: "success",
-              icon: CheckCircle,
-            },
-            {
-              action: "ייבוא הזמנות",
-              time: "לפני 3 ימים",
-              status: "success",
-              icon: CheckCircle,
-            },
-            {
-              action: "ניקוי לוגים",
-              time: "לפני שבוע",
-              status: "success",
-              icon: CheckCircle,
-            },
-          ].map((item, index) => {
-            const StatusIcon = item.icon;
-            return (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-white p-3 rounded border"
-              >
-                <div className="flex items-center space-x-3">
-                  <StatusIcon
-                    className={`h-5 w-5 ${
-                      item.status === "success"
-                        ? "text-green-600"
-                        : "text-red-600"
-                    }`}
-                  />
-                  <span className="text-sm font-medium">{item.action}</span>
+          {recentActivities.length > 0 ? (
+            recentActivities.map((item, index) => {
+              const StatusIcon = item.icon;
+              return (
+                <div
+                  key={index}
+                  className="flex items-center justify-between bg-white p-3 rounded border"
+                >
+                  <div className="flex items-center space-x-3">
+                    <StatusIcon
+                      className={`h-5 w-5 ${
+                        item.status === "success"
+                          ? "text-green-600"
+                          : "text-red-600"
+                      }`}
+                    />
+                    <span className="text-sm font-medium">{item.action}</span>
+                  </div>
+                  <span className="text-xs text-gray-500">{item.time}</span>
                 </div>
-                <span className="text-xs text-gray-500">{item.time}</span>
-              </div>
-            );
-          })}
+              );
+            })
+          ) : (
+            <div className="text-center text-gray-500 py-8">
+              <p className="text-sm">אין פעולות אחרונות להצגה</p>
+              <p className="text-xs mt-1">פעולות יוצגו כאן לאחר ביצוען</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
