@@ -1,0 +1,42 @@
+[33m3c40801[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mdev[m[33m, [m[1;31morigin/dev[m[33m)[m fix: Add missing customs APIs and resolve 404 errors
+[33m927cf83[m[33m ([m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m, [m[1;32mmain[m[33m)[m feat: Complete DataTools with dynamic KPIs and real-time activity tracking
+[33mfd04273[m עדכון ייבוא ספקים
+[33mbfc07b6[m עדכון טבלה
+[33m8d7c889[m feat: Complete supplier categories management system
+[33mfa25d9a[m feat: Complete template system with proper structure and validation
+[33m4e9e8ac[m feat: Complete archive system with restore and permanent delete
+[33me869e9b[m feat: Archive system for suppliers - complete implementation
+[33m3ff3c5c[m feat: Archive system for suppliers - complete implementation
+[33m932d85b[m עדכון תאריך בשם של הקובץ + הורדת שורה 4
+[33maadce97[m ניסיון לתקן קובץ לדוגמה
+[33md03cfb1[m fix: Complete Hebrew template with safe encoding
+[33m2facb88[m feat: Hebrew templates with proper structure and import
+[33md4e6f7d[m fix: Change template download from POST to GET
+[33md79da71[m fix: Simple English templates to resolve XLSX encoding
+[33m0f8565c[m fix: XLSX encoding for Hebrew characters in templates
+[33m50f9b13[m fix: Organize and fix import/export APIs
+[33mfa83293[m feat: Complete import/export system with templates
+[33mf0f2673[m fix: Critical bug fixes and stability improvements
+[33m1d10a10[m fix: React hooks positioning and dynamic currencies
+[33mf768dde[m fix: Update SupplierList to use contactPerson instead of contactName
+[33mfdae28e[m fix: Update EditSupplierModal to use contactPerson instead of contactName
+[33m24a239f[m fix: Update categories API to use relations instead of productCategory field
+[33m581211e[m fix: Update API routes for Next.js 15 params handling
+[33mbb9146e[m feat: Dynamic statuses and currencies system...
+[33m4dfc739[m Remove seed data button from data page
+[33m95793d3[m Fix OrdersList - add onViewGantt prop support
+[33m11a30c9[m calender per order
+[33m3499b1d[m Update upload API to use Cloudinary
+[33mb6f12db[m 3
+[33m5ddfaee[m Add auto-logout on screen lock and update OAuth prompt
+[33m3e6aead[m Update homepage: Gantt -> Calendar
+[33m3dd03d1[m Fix database connection
+[33ma260142[m Update Google OAuth credentials
+[33mab006d0[m Fix NextAuth error page with Suspense
+[33mf9dd28b[m Add prisma generate to build process
+[33me66241e[m Fix params API routes for Next.js 15
+[33m353991b[m שגיאות
+[33m0d9cba3[m 2
+[33m6724ba2[m 1
+[33mb7d3ddc[m Initial commit - R4PET Management System
+[33m838c3c5[m Initial commit from Create Next App
