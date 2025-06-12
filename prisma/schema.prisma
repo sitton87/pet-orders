@@ -1,16 +1,14 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite" 
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
 
 // טבלת משתמשים
 model User {
@@ -46,12 +44,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? 
-  access_token      String?
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? 
+  id_token          String? @db.Text
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -345,7 +343,7 @@ model AuditLog {
 model SystemSetting {
   id          String   @id @default(uuid())
   key         String   @unique // "order_statuses", "currencies", "default_currency"
-  value       String   // JSON string או plain text
+  value       String   @db.Text // JSON string או plain text
   type        String   // "json", "text", "number", "boolean"
   category    String   // "general", "financial", "orders", "notifications"
   description String?  // תיאור להגדרה
