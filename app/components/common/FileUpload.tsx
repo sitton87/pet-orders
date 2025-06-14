@@ -6,6 +6,7 @@ import {
   File,
   X,
   Download,
+  Eye,
   AlertCircle,
   CheckCircle,
   Loader2,
@@ -46,7 +47,27 @@ export default function FileUpload({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing files
+  // Function to sanitize filenames for upload (remove Hebrew, special chars)
+  const sanitizeFileName = (fileName: string): string => {
+    const lastDotIndex = fileName.lastIndexOf(".");
+    const name =
+      lastDotIndex > 0 ? fileName.substring(0, lastDotIndex) : fileName;
+    const extension = lastDotIndex > 0 ? fileName.substring(lastDotIndex) : "";
+
+    // Clean the name: remove Hebrew, special chars, spaces
+    const cleanName = name
+      .replace(/[\u0590-\u05FF]/g, "") // Remove Hebrew characters
+      .replace(/[^\w\-_.]/g, "_") // Replace special chars with underscore
+      .replace(/_{2,}/g, "_") // Replace multiple underscores with single
+      .replace(/^_+|_+$/g, "") // Remove leading/trailing underscores
+      .substring(0, 50); // Limit length
+
+    // If name becomes empty, use timestamp
+    const finalName = cleanName || `file_${Date.now()}`;
+    return finalName + extension;
+  };
+
+  // Load existing files on component mount
   useEffect(() => {
     loadFiles();
   }, [entityId, entityType]);
@@ -67,7 +88,7 @@ export default function FileUpload({
     }
   };
 
-  // Handle drag events
+  // Handle drag and drop events
   const handleDrag = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -97,7 +118,7 @@ export default function FileUpload({
   const handleFiles = async (fileList: FileList) => {
     setError(null);
 
-    // Check file count
+    // Check file count limit
     if (files.length + fileList.length > maxFiles) {
       setError(`ניתן להעלות עד ${maxFiles} קבצים`);
       return;
@@ -105,17 +126,17 @@ export default function FileUpload({
 
     const validFiles: File[] = [];
 
-    // Validate files
+    // Validate each file
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
 
-      // Check file size
+      // Check file size limit
       if (file.size > maxFileSize * 1024 * 1024) {
         setError(`הקובץ ${file.name} גדול מדי (מקסימום ${maxFileSize}MB)`);
         return;
       }
 
-      // Check file type
+      // Check allowed file types
       const allowedTypes = [
         "application/pdf",
         "application/msword",
@@ -139,14 +160,15 @@ export default function FileUpload({
       validFiles.push(file);
     }
 
-    // Upload files
+    // Upload all valid files
     setUploading(true);
     try {
       for (const file of validFiles) {
         await uploadFile(file);
       }
-      await loadFiles(); // Reload to get updated list
+      await loadFiles(); // Reload file list after upload
     } catch (error) {
+      console.error("Upload error:", error);
       setError("שגיאה בהעלאת הקבצים");
     } finally {
       setUploading(false);
@@ -158,8 +180,20 @@ export default function FileUpload({
   };
 
   const uploadFile = async (file: File) => {
+    const sanitizedName = sanitizeFileName(file.name);
+
+    console.log("Uploading file:", {
+      originalName: file.name,
+      sanitizedName: sanitizedName,
+      size: file.size,
+      type: file.type,
+    });
+
+    // Create FormData with original file and metadata
     const formData = new FormData();
     formData.append("file", file);
+    formData.append("sanitizedFileName", sanitizedName);
+    formData.append("originalFileName", file.name);
     formData.append("entityId", entityId);
     formData.append("entityType", entityType);
 
@@ -191,14 +225,69 @@ export default function FileUpload({
         onFilesChange?.(updatedFiles);
       }
     } catch (error) {
+      console.error("Delete file error:", error);
       setError("שגיאה במחיקת הקובץ");
     }
   };
 
-  const downloadFile = (file: FileItem) => {
+  const viewFile = (file: FileItem) => {
+    // Open file in new tab for viewing
     window.open(file.url, "_blank");
   };
 
+  const downloadFile = async (file: FileItem) => {
+    try {
+      console.log("🔄 Starting download for:", file.name);
+      console.log("📎 File URL:", file.url);
+
+      // Fetch file content
+      const response = await fetch(file.url, {
+        method: "GET",
+        cache: "no-cache",
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const blob = await response.blob();
+      console.log("📦 Blob created:", {
+        size: blob.size,
+        type: blob.type,
+      });
+
+      // Create download with proper filename encoding
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+
+      // Ensure proper filename encoding for Hebrew characters
+      const safeFileName = file.name.replace(/[<>:"/\\|?*]/g, "_");
+      link.download = safeFileName;
+
+      // Set additional attributes for better browser support
+      link.style.display = "none";
+      link.target = "_blank";
+
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up after a short delay
+      setTimeout(() => {
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(downloadUrl);
+      }, 100);
+
+      console.log("✅ Download completed successfully");
+    } catch (error) {
+      console.error("❌ Download failed:", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      alert(`שגיאה בהורדת הקובץ: ${errorMessage}`);
+    }
+  };
+
+  // Get appropriate icon based on file type
   const getFileIcon = (type: string) => {
     if (type.startsWith("image/")) return <Image className="h-4 w-4" />;
     if (type === "application/pdf")
@@ -212,6 +301,7 @@ export default function FileUpload({
     return <File className="h-4 w-4" />;
   };
 
+  // Format file size for display
   const formatFileSize = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -220,6 +310,7 @@ export default function FileUpload({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
+  // Loading state
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -231,7 +322,7 @@ export default function FileUpload({
 
   return (
     <div className="space-y-4">
-      {/* Upload Area */}
+      {/* File Upload Area */}
       <div
         className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
           dragActive
@@ -285,7 +376,7 @@ export default function FileUpload({
         </div>
       )}
 
-      {/* Uploading State */}
+      {/* Upload Progress Indicator */}
       {uploading && (
         <div className="flex items-center space-x-2 p-3 bg-blue-50 border border-blue-200 rounded-md">
           <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
@@ -319,13 +410,25 @@ export default function FileUpload({
                 </div>
 
                 <div className="flex items-center space-x-2">
+                  {/* View File Button */}
+                  <button
+                    onClick={() => viewFile(file)}
+                    className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
+                    title="צפייה בקובץ"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+
+                  {/* Download File Button */}
                   <button
                     onClick={() => downloadFile(file)}
-                    className="p-1 text-blue-600 hover:text-blue-800 transition-colors"
-                    title="הורד"
+                    className="p-1 text-green-600 hover:text-green-800 transition-colors"
+                    title="הורדת קובץ"
                   >
                     <Download className="h-4 w-4" />
                   </button>
+
+                  {/* Delete File Button */}
                   <button
                     onClick={() => deleteFile(file.id)}
                     className="p-1 text-red-600 hover:text-red-800 transition-colors"

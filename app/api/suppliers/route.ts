@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET() {
   try {
     const suppliers = await prisma.supplier.findMany({
-      where: { isActive: true }, // ✨ הוסף שורה זו
+      where: { isActive: true },
       include: {
         _count: { select: { orders: true } },
       },

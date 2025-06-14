@@ -44,12 +44,12 @@ model Account {
   type              String
   provider          String
   providerAccountId String  @map("provider_account_id")
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
+  refresh_token     String?  
+  access_token      String?  
   expires_at        Int?
   token_type        String?
   scope             String?
-  id_token          String? @db.Text
+  id_token          String?  
   session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -136,7 +136,7 @@ model Supplier {
   city                 String
   address              String?
   phone                String?
-  email                String
+  email                String?
   contactPerson        String?  @map("contact_person")
   contactPhone         String?  @map("contact_phone")
   contactPosition      String?  @map("contact_position")
@@ -154,7 +154,7 @@ model Supplier {
   beneficiary          String?
   iban                 String?
   bic                  String?
-  connection            String?  @map("connection")
+  connection           String?  @map("connection")
   isActive             Boolean  @default(true) 
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
@@ -328,8 +328,8 @@ model AuditLog {
   tableName String   @map("table_name")
   recordId  String   @map("record_id")
   fieldName String   @map("field_name")
-  oldValue  String?  @map("old_value")
-  newValue  String   @map("new_value")
+  oldvalue       String?  @map("old_value")
+  newvalue       String      @map("new_value")
   changedAt DateTime @default(now()) @map("changed_at")
   changedBy String   @map("changed_by")
 
@@ -343,7 +343,7 @@ model AuditLog {
 model SystemSetting {
   id          String   @id @default(uuid())
   key         String   @unique // "order_statuses", "currencies", "default_currency"
-  value       String   @db.Text // JSON string או plain text
+  value       String      // JSON string או plain text
   type        String   // "json", "text", "number", "boolean"
   category    String   // "general", "financial", "orders", "notifications"
   description String?  // תיאור להגדרה
