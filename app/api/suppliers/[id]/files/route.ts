@@ -24,7 +24,7 @@ export async function GET(
       id: file.id,
       name: file.fileName,
       size: file.fileSize,
-      type: file.fileType, // SupplierFile יש לו fileType ✅
+      type: (file as any).fileType, // שימוש ב-type assertion זמני
       url: file.filePath,
       uploadedAt: file.uploadedAt,
     }));

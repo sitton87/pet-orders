@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "הקובץ ריק או פגום" }, { status: 400 });
     }
 
-    // Determine resource type based on file type
+    // Determine resource type based on file type - SIMPLIFIED
     const getResourceType = (fileType: string) => {
       if (fileType.startsWith("image/")) return "image";
       if (fileType === "application/pdf") return "raw";
@@ -146,17 +146,15 @@ export async function POST(request: NextRequest) {
       fileType: file.type,
     });
 
-    // Upload to Cloudinary using sanitized filename
+    // SIMPLIFIED UPLOAD - No complex transformations
     const uploadResult = await new Promise((resolve, reject) => {
       cloudinary.uploader
         .upload_stream(
           {
             public_id: publicId,
-            resource_type: resourceType, // Use correct resource type
+            resource_type: resourceType,
             access_mode: "public",
-            delivery_type: "upload",
-            use_filename: false, // Don't use original filename
-            unique_filename: false,
+            use_filename: false,
           },
           (error, result) => {
             if (error) {
@@ -173,18 +171,12 @@ export async function POST(request: NextRequest) {
     });
 
     const cloudinaryResult = uploadResult as any;
-    let fileUrl = cloudinaryResult.secure_url;
-
-    // For PDF files, ensure the URL is correct for raw resource type
-    if (file.type === "application/pdf" && fileUrl.includes("/image/upload/")) {
-      fileUrl = fileUrl.replace("/image/upload/", "/raw/upload/");
-      console.log("Corrected PDF URL:", fileUrl);
-    }
+    const fileUrl = cloudinaryResult.secure_url; // Use URL as-is from Cloudinary
 
     console.log("Cloudinary upload successful:", {
       publicId: publicId,
       secureUrl: fileUrl,
-      originalUrl: cloudinaryResult.secure_url,
+      resourceType: resourceType,
     });
 
     // Get or create a user for uploads
@@ -202,61 +194,50 @@ export async function POST(request: NextRequest) {
       userId = "placeholder-user";
     }
 
-    // Save file info to database with original filename for display
-    let responseData;
-
+    // Create database record
     if (entityType === "supplier") {
-      const fileRecord = await prisma.supplierFile.create({
+      const supplierFile = await prisma.supplierFile.create({
         data: {
           id: fileId,
-          fileName: originalFileName, // Store original Hebrew name for display
+          supplierId: entityId,
+          fileName: originalFileName,
+          filePath: fileUrl,
           fileSize: file.size,
           fileType: file.type,
-          filePath: fileUrl, // Cloudinary URL
-          supplierId: entityId,
           uploadedBy: userId,
         },
       });
 
-      responseData = {
-        id: fileRecord.id,
-        name: fileRecord.fileName, // Show original name to user
-        size: fileRecord.fileSize,
-        type: fileRecord.fileType,
-        url: fileRecord.filePath,
-        uploadedAt: fileRecord.uploadedAt,
-        cloudinaryId: publicId, // Store ID for future deletion
-      };
-    } else {
-      const fileRecord = await prisma.orderFile.create({
+      return NextResponse.json({
+        id: supplierFile.id,
+        name: supplierFile.fileName,
+        size: supplierFile.fileSize,
+        type: supplierFile.fileType,
+        url: supplierFile.filePath,
+        uploadedAt: supplierFile.uploadedAt,
+      });
+    } else if (entityType === "order") {
+      const orderFile = await prisma.orderFile.create({
         data: {
           id: fileId,
-          fileName: originalFileName, // Store original Hebrew name for display
-          fileSize: file.size,
-          filePath: fileUrl, // Cloudinary URL
           orderId: entityId,
+          fileName: originalFileName,
+          filePath: fileUrl,
+          fileSize: file.size,
+          fileType: file.type,
           uploadedBy: userId,
         },
       });
 
-      responseData = {
-        id: fileRecord.id,
-        name: fileRecord.fileName, // Show original name to user
-        size: fileRecord.fileSize,
-        type: file.type, // No fileType field in OrderFile so use file.type
-        url: fileRecord.filePath,
-        uploadedAt: fileRecord.uploadedAt,
-        cloudinaryId: publicId, // Store ID for future deletion
-      };
+      return NextResponse.json({
+        id: orderFile.id,
+        name: orderFile.fileName,
+        size: orderFile.fileSize,
+        type: orderFile.fileType,
+        url: orderFile.filePath,
+        uploadedAt: orderFile.uploadedAt,
+      });
     }
-
-    console.log("File uploaded successfully:", {
-      fileId: fileId,
-      originalName: originalFileName,
-      url: fileUrl,
-    });
-
-    return NextResponse.json(responseData);
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json({ error: "שגיאה בהעלאת הקובץ" }, { status: 500 });

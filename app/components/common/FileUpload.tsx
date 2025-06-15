@@ -237,56 +237,26 @@ export default function FileUpload({
 
   const downloadFile = async (file: FileItem) => {
     try {
-      console.log("🔄 Starting download for:", file.name);
-      console.log("📎 File URL:", file.url);
+      console.log("Starting download:", file.name, file.url);
 
-      // Fetch file content
-      const response = await fetch(file.url, {
-        method: "GET",
-        cache: "no-cache",
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const blob = await response.blob();
-      console.log("📦 Blob created:", {
-        size: blob.size,
-        type: blob.type,
-      });
-
-      // Create download with proper filename encoding
-      const downloadUrl = window.URL.createObjectURL(blob);
+      // Create download link directly without fetch
       const link = document.createElement("a");
-      link.href = downloadUrl;
-
-      // Ensure proper filename encoding for Hebrew characters
-      const safeFileName = file.name.replace(/[<>:"/\\|?*]/g, "_");
-      link.download = safeFileName;
-
-      // Set additional attributes for better browser support
-      link.style.display = "none";
+      link.href = file.url;
+      link.download = file.name; // This forces download instead of opening
       link.target = "_blank";
 
+      // Add to DOM temporarily
       document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
 
-      // Clean up after a short delay
-      setTimeout(() => {
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(downloadUrl);
-      }, 100);
-
-      console.log("✅ Download completed successfully");
+      console.log("Download triggered for:", file.name);
     } catch (error) {
-      console.error("❌ Download failed:", error);
-      const errorMessage =
-        error instanceof Error ? error.message : "Unknown error occurred";
-      alert(`שגיאה בהורדת הקובץ: ${errorMessage}`);
+      console.error("Download error:", error);
+      // Fallback - open in new tab
+      window.open(file.url, "_blank");
     }
   };
-
   // Get appropriate icon based on file type
   const getFileIcon = (type: string) => {
     if (type.startsWith("image/")) return <Image className="h-4 w-4" />;

@@ -24,7 +24,8 @@ export async function GET(
       id: file.id,
       name: file.fileName,
       size: file.fileSize,
-      type: file.fileName.split(".").pop() || "unknown", // אין fileType ב-OrderFile
+      type:
+        (file as any).fileType || file.fileName.split(".").pop() || "unknown", // שימוש ב-type assertion זמני
       url: file.filePath,
       uploadedAt: file.uploadedAt,
     }));
