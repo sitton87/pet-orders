@@ -107,7 +107,7 @@ export default function SuppliersList() {
 
   const handleEditSupplier = async (supplierId: string, supplierData: any) => {
     try {
-      const response = await fetch(`/api/suppliers?id=${supplierId}`, {
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -131,7 +131,7 @@ export default function SuppliersList() {
 
   const handleDeleteSupplier = async (supplierId: string) => {
     try {
-      const response = await fetch(`/api/suppliers?id=${supplierId}`, {
+      const response = await fetch(`/api/suppliers/${supplierId}`, {
         method: "DELETE",
       });
 

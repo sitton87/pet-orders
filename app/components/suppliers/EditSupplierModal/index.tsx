@@ -561,7 +561,6 @@ export default function EditSupplierModal({
                     placeholder="מספר רישיון"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     תוקף רישיון ייבוא
@@ -575,7 +574,6 @@ export default function EditSupplierModal({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     רישיון מספוא
@@ -590,7 +588,6 @@ export default function EditSupplierModal({
                     placeholder="מספר רישיון מספוא"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     תוקף רישיון מספוא
@@ -604,7 +601,6 @@ export default function EditSupplierModal({
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     שם בנק
@@ -619,7 +615,6 @@ export default function EditSupplierModal({
                     placeholder="שם הבנק"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     מוטב
@@ -634,7 +629,6 @@ export default function EditSupplierModal({
                     placeholder="שם המוטב"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     IBAN
@@ -647,7 +641,6 @@ export default function EditSupplierModal({
                     placeholder="IBAN"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     BIC
@@ -658,6 +651,18 @@ export default function EditSupplierModal({
                     onChange={(e) => handleInputChange("bic", e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     placeholder="BIC"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    הערות
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={formData.notes || ""}
+                    onChange={(e) => handleInputChange("notes", e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    placeholder="הערות כלליות על הספק..."
                   />
                 </div>
               </div>

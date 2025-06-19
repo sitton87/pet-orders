@@ -130,40 +130,42 @@ model CustomsAgent {
 
 // טבלת ספקים
 model Supplier {
-  id                   String   @id @default(uuid())
+  id                   String    @id @default(uuid())
   name                 String
   country              String
   city                 String
   address              String?
   phone                String?
   email                String?
-  contactPerson        String?  @map("contact_person")
-  contactPhone         String?  @map("contact_phone")
-  contactPosition      String?  @map("contact_position")
-  productionTimeWeeks  Int      @map("production_time_weeks")
-  shippingTimeWeeks    Int      @map("shipping_time_weeks")
-  paymentTerms         String?  @map("payment_terms")
-  hasAdvancePayment    Boolean  @default(false) @map("has_advance_payment")
-  advancePercentage    Int?     @map("advance_percentage")
-  currency             String   @default("USD")
-  importLicense        String?  @map("import_license")
+  contactPerson        String?   @map("contact_person")
+  contactPhone         String?   @map("contact_phone")
+  contactPosition      String?   @map("contact_position")
+  productionTimeWeeks  Int       @map("production_time_weeks")
+  shippingTimeWeeks    Int       @map("shipping_time_weeks")
+  paymentTerms         String?   @map("payment_terms")
+  hasAdvancePayment    Boolean   @default(false) @map("has_advance_payment")
+  advancePercentage    Int?      @map("advance_percentage")
+  currency             String    @default("USD")
+  importLicense        String?   @map("import_license")
   licenseExpiry        DateTime? @map("license_expiry")
-  feedLicense          String?  @map("feed_license")
+  feedLicense          String?   @map("feed_license")
   feedLicenseExpiry    DateTime? @map("feed_license_expiry")
-  bankName             String?  @map("bank_name")
+  bankName             String?   @map("bank_name")
   beneficiary          String?
   iban                 String?
   bic                  String?
-  connection           String?  @map("connection")
-  isActive             Boolean  @default(true) 
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  connection           String?   @map("connection")
+  notes                String?   @db.Text
+  minimumOrder         Float?    @default(0) @map("minimum_order")
   
+  isActive             Boolean   @default(true) 
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   // יחסים
-  orders             Order[]
-  supplierCategories SupplierCategory[]
-  files              SupplierFile[]
+  orders               Order[]
+  supplierCategories   SupplierCategory[]
+  files                SupplierFile[]
 
   @@map("suppliers")
 }
