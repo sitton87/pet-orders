@@ -203,6 +203,7 @@ model Order {
   notes                String?
   portReleaseCost      Decimal?  @map("port_release_cost")
   calculatedEta        DateTime? @map("calculated_eta")
+  actualEta            DateTime? @map("actual_eta")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
 

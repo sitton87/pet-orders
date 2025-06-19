@@ -64,6 +64,7 @@ export interface Order {
   notes?: string;
   portReleaseCost?: number;
   originalCurrency: string;
+  actualEta?: Date;
   createdAt: string;
   updatedAt?: string;
 }

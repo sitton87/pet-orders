@@ -112,7 +112,7 @@ async function exportOrders() {
     "מספר הזמנה": order.orderNumber,
     ספק: order.supplier?.name || "",
     סטטוס: order.status,
-    "תאריך הגעה משוער": new Date(order.etaFinal).toLocaleDateString("he-IL"),
+    ETA: new Date(order.etaFinal).toLocaleDateString("he-IL"),
     "סכום כולל": Number(order.totalAmount),
     מקדמה: Number(order.advanceAmount),
     "תשלום סופי": Number(order.finalPaymentAmount),

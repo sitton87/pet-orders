@@ -121,8 +121,7 @@ export default function AddOrderModal({
     switch (step) {
       case 1:
         if (!formData.supplierId) newErrors.supplierId = "יש לבחור ספק";
-        if (!formData.etaFinal)
-          newErrors.etaFinal = "יש להזין תאריך הגעה משוער";
+        if (!formData.etaFinal) newErrors.etaFinal = "יש להזין ETA";
         if (formData.totalAmount <= 0)
           newErrors.totalAmount = "יש להזין סכום תקין";
         break;
@@ -221,7 +220,7 @@ export default function AddOrderModal({
 
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">
-          תאריך הגעה משוער *
+          ETA *
         </label>
         <input
           type="date"
