@@ -192,7 +192,8 @@ export default function OrderCard({
               <div className="flex items-center space-x-2">
                 <Calendar className="h-4 w-4 text-gray-400" />
                 <span>
-                  ETA: {new Date(order.etaFinal).toLocaleDateString("he-IL")}
+                  תאריך הגעה רצוי:{" "}
+                  {new Date(order.etaFinal).toLocaleDateString("he-IL")}
                 </span>
               </div>
               <div className="flex items-center space-x-2">

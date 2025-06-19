@@ -231,7 +231,7 @@ export default function EditOrderModal({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ETA <span className="text-red-500">*</span>
+                    תאריך הגעה רצוי<span className="text-red-500">*</span>
                   </label>
                   <input
                     type="date"
@@ -246,7 +246,7 @@ export default function EditOrderModal({
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    ETA בפועל
+                    תאריך הגעה בפועל
                   </label>
                   <input
                     type="date"
