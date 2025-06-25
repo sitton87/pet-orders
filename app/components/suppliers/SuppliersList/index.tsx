@@ -23,6 +23,13 @@ export default function SuppliersList() {
     text: string;
   } | null>(null);
 
+  // State לניהול חלונות פתוחים
+  const [openSupplier, setOpenSupplier] = useState<{
+    id: string;
+    type: "details" | "files";
+    row: number;
+  } | null>(null);
+
   // טעינת ספקים מה-API
   useEffect(() => {
     fetchSuppliers();
@@ -285,15 +292,23 @@ export default function SuppliersList() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredSuppliers.map((supplier) => (
-            <SupplierCard
-              key={supplier.id}
-              supplier={supplier}
-              onEdit={handleEditClick}
-              onArchive={handleArchiveSupplier}
-              onDelete={handleDeleteSupplier}
-            />
-          ))}
+          {filteredSuppliers.map((supplier, index) => {
+            // חישוב מספר השורה (3 כרטיסים בשורה ב-lg)
+            const rowIndex = Math.floor(index / 3);
+
+            return (
+              <SupplierCard
+                key={supplier.id}
+                supplier={supplier}
+                rowIndex={rowIndex}
+                openSupplier={openSupplier}
+                setOpenSupplier={setOpenSupplier}
+                onEdit={handleEditClick}
+                onArchive={handleArchiveSupplier}
+                onDelete={handleDeleteSupplier}
+              />
+            );
+          })}
         </div>
       )}
 

@@ -33,12 +33,14 @@ export default function SuppliersPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
       <div className="w-full px-4 py-8 mt-16">
-        {" "}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">ניהול ספקים</h1>
-          <p className="text-gray-600">ניהול פרטי ספקים, זמני ייצור ושילוח</p>
+        <div className="mb-2">
+          <div className="flex items-center space-x-4">
+            <h1 className="text-3xl font-bold text-gray-900">ניהול ספקים</h1>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <p className="text-gray-600">ניהול פרטי ספקים, זמני ייצור ושילוח</p>
+          </div>
         </div>
-        <div className="mb-8">
+        <div className="mb-6">
           <SupplierKPIs />
         </div>
         <div className="bg-white rounded-lg shadow-sm border p-6">

@@ -20,76 +20,149 @@ export default function SupplierKPIs() {
   });
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  // פונקציה לרענון ידני
+  const handleRefresh = () => {
+    console.log("🔄 Manual refresh triggered");
     fetchKPIData();
-  }, []);
+  };
+
+  useEffect(() => {
+    // טעינה ראשונית
+    fetchKPIData();
+
+    // רענון כשחוזרים לדף (focus)
+    const handleFocus = () => {
+      console.log("🔄 Page focused - refreshing KPI data");
+      fetchKPIData();
+    };
+
+    // רענון כשהדף נעשה visible שוב
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log("🔄 Page visible - refreshing KPI data");
+        fetchKPIData();
+      }
+    };
+
+    // הוסף event listeners
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    // ניקוי
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, []); // רק פעם אחת ברכוב
 
   const fetchKPIData = async () => {
     try {
       setIsLoading(true);
 
+      // הוסף timestamp כדי למנוע cache
+      const timestamp = new Date().getTime();
+
       // טעינת ספקים
-      const suppliersResponse = await fetch("/api/suppliers");
-      const suppliers = await suppliersResponse.json();
+      const suppliersResponse = await fetch(`/api/suppliers?t=${timestamp}`);
+      if (!suppliersResponse.ok) {
+        throw new Error(`Suppliers API error: ${suppliersResponse.status}`);
+      }
+      const suppliersData = await suppliersResponse.json();
 
       // טעינת הזמנות
-      const ordersResponse = await fetch("/api/orders");
-      const orders = await ordersResponse.json();
+      const ordersResponse = await fetch(`/api/orders?t=${timestamp}`);
+      if (!ordersResponse.ok) {
+        throw new Error(`Orders API error: ${ordersResponse.status}`);
+      }
+      const ordersData = await ordersResponse.json();
 
-      // חישוב KPIs אמיתיים
+      // 🔧 תיקון: וודא שאנחנו עובדים על המערכים הנכונים
+      const suppliers = Array.isArray(suppliersData)
+        ? suppliersData
+        : suppliersData.suppliers || [];
+      const orders = Array.isArray(ordersData)
+        ? ordersData
+        : ordersData.orders || [];
+
+      console.log("✅ Suppliers count:", suppliers.length);
+      console.log("✅ Orders count:", orders.length);
+      console.log("✅ Sample supplier:", suppliers[0]);
+
+      // חישוב KPIs
       const totalSuppliers = suppliers.length;
 
       // ספקים עם הזמנות פעילות
       const activeSupplierIds = new Set(
         orders
-          .filter(
-            (order: any) =>
-              order.status !== "הושלם" && order.status !== "מבוטלת"
-          )
+          .filter((order: any) => {
+            const isActive =
+              order.status !== "הושלם" && order.status !== "מבוטלת";
+            return isActive;
+          })
           .map((order: any) => order.supplierId)
       );
       const suppliersWithActiveOrders = activeSupplierIds.size;
 
-      // ממוצע מקדמה (רק של ספקים שדורשים מקדמה)
-      const suppliersWithAdvance = suppliers.filter(
-        (s: any) => s.hasAdvancePayment
-      );
+      // 🔧 תיקון: ממוצע מקדמה
+      const suppliersWithAdvance = suppliers.filter((s: any) => {
+        const hasAdvance = s.hasAdvancePayment === true;
+        console.log(
+          `Supplier ${s.name}: hasAdvancePayment=${s.hasAdvancePayment}, percentage=${s.advancePercentage}`
+        );
+        return hasAdvance;
+      });
+
       const averageAdvancePayment =
         suppliersWithAdvance.length > 0
-          ? suppliersWithAdvance.reduce(
-              (sum: number, s: any) => sum + (s.advancePercentage || 0),
-              0
-            ) / suppliersWithAdvance.length
+          ? suppliersWithAdvance.reduce((sum: number, s: any) => {
+              const percentage = Number(s.advancePercentage) || 0;
+              return sum + percentage;
+            }, 0) / suppliersWithAdvance.length
           : 0;
 
-      // ממוצע זמן ייצור
+      // 🔧 תיקון: ממוצע זמן ייצור
+      const validProductionTimes = suppliers
+        .map((s: any) => Number(s.productionTimeWeeks) || 0)
+        .filter((time: number) => time > 0);
+
       const averageProductionTime =
-        totalSuppliers > 0
-          ? suppliers.reduce(
-              (sum: number, s: any) => sum + (s.productionTimeWeeks || 0),
+        validProductionTimes.length > 0
+          ? validProductionTimes.reduce(
+              (sum: number, time: number) => sum + time,
               0
-            ) / totalSuppliers
+            ) / validProductionTimes.length
           : 0;
 
-      // ממוצע זמן שילוח
+      // 🔧 תיקון: ממוצע זמן שילוח
+      const validShippingTimes = suppliers
+        .map((s: any) => Number(s.shippingTimeWeeks) || 0)
+        .filter((time: number) => time > 0);
+
       const averageShippingTime =
-        totalSuppliers > 0
-          ? suppliers.reduce(
-              (sum: number, s: any) => sum + (s.shippingTimeWeeks || 0),
+        validShippingTimes.length > 0
+          ? validShippingTimes.reduce(
+              (sum: number, time: number) => sum + time,
               0
-            ) / totalSuppliers
+            ) / validShippingTimes.length
           : 0;
+
+      console.log("📊 Calculated KPIs:", {
+        totalSuppliers,
+        suppliersWithActiveOrders,
+        averageAdvancePayment,
+        averageProductionTime,
+        averageShippingTime,
+      });
 
       setKpiData({
         totalSuppliers,
         suppliersWithActiveOrders,
-        averageAdvancePayment: Math.round(averageAdvancePayment),
+        averageAdvancePayment: Math.round(averageAdvancePayment * 10) / 10,
         averageProductionTime: Math.round(averageProductionTime * 10) / 10,
         averageShippingTime: Math.round(averageShippingTime * 10) / 10,
       });
     } catch (error) {
       console.error("Error fetching KPI data:", error);
-      // במקרה של שגיאה, הצג 0 במקום נתונים דמה
       setKpiData({
         totalSuppliers: 0,
         suppliersWithActiveOrders: 0,
@@ -147,43 +220,73 @@ export default function SupplierKPIs() {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-        {Array(5)
-          .fill(0)
-          .map((_, index) => (
-            <div
-              key={index}
-              className="bg-white p-6 rounded-lg shadow-md animate-pulse"
-            >
-              <div className="h-4 bg-gray-200 rounded mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded"></div>
-            </div>
-          ))}
+      <div>
+        {/* כפתור רענון במצב טעינה */}
+        <div className="flex justify-between items-center mb-0">
+          <h3 className="text-lg font-semibold text-gray-900">מדדי ספקים</h3>
+          <button
+            disabled
+            className="flex items-center space-x-2 px-3 py-1 text-sm bg-gray-400 text-white rounded cursor-not-allowed"
+          >
+            <span>טוען...</span>
+            <span>⏳</span>
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {Array(5)
+            .fill(0)
+            .map((_, index) => (
+              <div
+                key={index}
+                className="bg-white p-6 rounded-lg shadow-md animate-pulse"
+              >
+                <div className="h-4 bg-gray-200 rounded mb-4"></div>
+                <div className="h-8 bg-gray-200 rounded"></div>
+              </div>
+            ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
-      {kpiCards.map((card, index) => (
-        <div
-          key={index}
-          className={`${card.bgColor} p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow`}
+    <div>
+      {/* כפתור רענון */}
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-lg font-semibold text-gray-900">מדדי ספקים</h3>
+        <button
+          onClick={handleRefresh}
+          disabled={isLoading}
+          className="flex items-center space-x-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-600 mb-2">
-                {card.title}
-              </p>
-              <p className={`text-2xl font-bold ${card.textColor}`}>
-                {card.value}
-                {card.suffix}
-              </p>
+          <span>{isLoading ? "מרענן..." : "רענן"}</span>
+          {!isLoading && <span>🔄</span>}
+        </button>
+      </div>
+
+      {/* הKPI cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        {kpiCards.map((card, index) => (
+          <div
+            key={index}
+            className={`${card.bgColor} p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow`}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 mb-2">
+                  {card.title}
+                </p>
+                <p className={`text-2xl font-bold ${card.textColor}`}>
+                  {card.value}
+                  {card.suffix}
+                </p>
+              </div>
+              <div className="text-2xl opacity-80">{card.icon}</div>
             </div>
-            <div className="text-2xl opacity-80">{card.icon}</div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
