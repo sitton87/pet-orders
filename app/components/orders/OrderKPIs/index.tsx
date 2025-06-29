@@ -199,16 +199,16 @@ export default function OrderKPIs({ orders }: OrderKPIsProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
         {Array(7)
           .fill(0)
           .map((_, index) => (
             <div
               key={index}
-              className="bg-white p-6 rounded-lg shadow-md animate-pulse"
+              className="bg-white p-3 lg:p-6 rounded-lg shadow-md animate-pulse min-w-0"
             >
-              <div className="h-4 bg-gray-200 rounded mb-4"></div>
-              <div className="h-8 bg-gray-200 rounded"></div>
+              <div className="h-3 bg-gray-200 rounded mb-2"></div>
+              <div className="h-6 bg-gray-200 rounded"></div>
             </div>
           ))}
       </div>
@@ -228,39 +228,48 @@ export default function OrderKPIs({ orders }: OrderKPIsProps) {
               setIsLoading(false);
             }, 500);
           }}
-          className="px-4 py- bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          disabled={isLoading}
+          className={`px-4 py-1 text-white rounded-md transition-colors flex items-center space-x-2 ${
+            isLoading
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
-          <span>רענן נתונים</span>
-          <svg
-            className="h-4 w-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-            />
-          </svg>
+          <span>{isLoading ? "טוען..." : "רענן נתונים"}</span>
+          {isLoading ? (
+            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
+          ) : (
+            <svg
+              className="h-4 w-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
+            </svg>
+          )}
         </button>
       </div>
 
       {/* KPI Cards עליונים */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {kpiCards.map((card, index) => (
           <div
             key={index}
-            className={`${card.bgColor} p-4 lg:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative group`}
+            className={`${card.bgColor} p-3 lg:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative group min-w-0`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs lg:text-sm font-medium text-gray-600 mb-2">
+            <div className="flex items-center justify-between min-w-0">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs lg:text-sm font-medium text-gray-600 mb-2 truncate">
                   {card.title}
                 </p>
                 <p
-                  className={`text-lg lg:text-2xl font-bold ${card.textColor}`}
+                  className={`text-sm lg:text-2xl font-bold ${card.textColor} break-words`}
                 >
                   {typeof card.value === "string"
                     ? card.value
@@ -268,12 +277,14 @@ export default function OrderKPIs({ orders }: OrderKPIsProps) {
                 </p>
                 {/* תיאור נוסף לKPIs החדשים */}
                 {card.description && (
-                  <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity truncate">
                     {card.description}
                   </p>
                 )}
               </div>
-              <div className="text-xl lg:text-2xl opacity-80">{card.icon}</div>
+              <div className="text-lg lg:text-2xl opacity-80 flex-shrink-0 ml-2">
+                {card.icon}
+              </div>
             </div>
           </div>
         ))}
@@ -286,9 +297,12 @@ export default function OrderKPIs({ orders }: OrderKPIsProps) {
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           {Object.entries(kpiData.statusBreakdown).map(([status, count]) => (
-            <div key={status} className="text-center p-3 bg-gray-50 rounded-lg">
+            <div
+              key={status}
+              className="text-center p-3 bg-gray-50 rounded-lg min-w-0"
+            >
               <div className="text-lg font-bold text-gray-900">{count}</div>
-              <div className="text-xs text-gray-600">{status}</div>
+              <div className="text-xs text-gray-600 truncate">{status}</div>
             </div>
           ))}
         </div>
