@@ -53,6 +53,65 @@ export default function AddOrderModal({
     null
   );
 
+  // 🆕 פונקציה ליצירת קיצור ספק אוטומטי
+  const generateSupplierPrefix = (supplierName: string): string => {
+    // ניקוי רווחים מיותרים ופיצול למילים
+    const words = supplierName
+      .trim()
+      .split(/[\s\-]+/)
+      .filter((word) => word.length > 0);
+    if (words.length === 1) {
+      // מילה אחת → 4 אותיות ראשונות
+      return words[0].substring(0, 4).toUpperCase();
+    } else if (words.length === 2) {
+      // שתי מילים → 2 אותיות מכל מילה
+      return (
+        words[0].substring(0, 2) + words[1].substring(0, 2)
+      ).toUpperCase();
+    } else {
+      // 3+ מילים → 2 מהראשונה, 1 מהשנייה, 1 מהשלישית
+      return (
+        words[0].substring(0, 2) +
+        words[1].substring(0, 1) +
+        words[2].substring(0, 1)
+      ).toUpperCase();
+    }
+  };
+
+  // 🆕 פונקציה ליצירת מספר הזמנה חכם
+  const generateOrderNumber = async (): Promise<string> => {
+    if (!selectedSupplier) {
+      throw new Error("No supplier selected");
+    }
+
+    try {
+      // קבלת ספירת הזמנות השנה הנוכחית
+      const currentYear = new Date().getFullYear();
+      const response = await fetch(`/api/orders/count?year=${currentYear}`);
+
+      let orderCount = 0;
+      if (response.ok) {
+        const data = await response.json();
+        orderCount = data.count || 0;
+      } else {
+        console.warn("Failed to fetch order count, using fallback");
+      }
+
+      // יצירת רכיבי מספר ההזמנה
+      const supplierPrefix = generateSupplierPrefix(selectedSupplier.name);
+      const now = new Date();
+      const month = String(now.getMonth() + 1).padStart(2, "0"); // 01-12
+      const year = String(now.getFullYear()).slice(-2); // 25, 26, etc.
+      const sequentialNumber = String(orderCount + 1).padStart(3, "0"); // 001, 002, etc.
+
+      return `${supplierPrefix}-${month}${year}-${sequentialNumber}`;
+    } catch (error) {
+      console.error("Error generating order number:", error);
+      // fallback למספר הזמנה פשוט במקרה של שגיאה
+      return `ORD-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    }
+  };
+
   // עדכון ספק נבחר
   useEffect(() => {
     if (formData.supplierId) {
@@ -151,21 +210,24 @@ export default function AddOrderModal({
     setCurrentStep((prev) => Math.max(prev - 1, 1));
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (validateStep(currentStep)) {
-      // יצירת מספר הזמנה אוטומטי
-      const orderNumber = `ORD-${new Date().getFullYear()}-${String(
-        Date.now()
-      ).slice(-6)}`;
+      try {
+        // 🆕 יצירת מספר הזמנה חכם
+        const orderNumber = await generateOrderNumber();
 
-      const orderData = {
-        ...formData,
-        orderNumber,
-        status: "הוזמן מהספק",
-      };
+        const orderData = {
+          ...formData,
+          orderNumber,
+          status: "הכנת הזמנה",
+        };
 
-      onAddOrder(orderData);
-      handleClose();
+        onAddOrder(orderData);
+        handleClose();
+      } catch (error) {
+        console.error("Error creating order:", error);
+        alert("שגיאה ביצירת מספר הזמנה. נסה שוב.");
+      }
     }
   };
 
@@ -255,6 +317,7 @@ export default function AddOrderModal({
         )}
       </div>
 
+      {/* 🆕 תצוגת מספר הזמנה חזוי */}
       {selectedSupplier && (
         <div className="bg-blue-50 p-3 rounded-md">
           <p className="text-sm text-blue-700">
@@ -265,8 +328,14 @@ export default function AddOrderModal({
             זמן שילוח: {selectedSupplier.shippingTimeWeeks} שבועות
             <br />
             {selectedSupplier.hasAdvancePayment && (
-              <>מקדמה נדרשת: {selectedSupplier.advancePercentage}%</>
+              <>
+                מקדמה נדרשת: {selectedSupplier.advancePercentage}%<br />
+              </>
             )}
+            <strong>מספר הזמנה חזוי:</strong>{" "}
+            {generateSupplierPrefix(selectedSupplier.name)}-
+            {String(new Date().getMonth() + 1).padStart(2, "0")}
+            {String(new Date().getFullYear()).slice(-2)}-XXX
           </p>
         </div>
       )}
@@ -456,6 +525,15 @@ export default function AddOrderModal({
           {formData.containerNumber && (
             <p>
               <strong>קונטיינר:</strong> {formData.containerNumber}
+            </p>
+          )}
+          {/* 🆕 הצגת מספר הזמנה חזוי */}
+          {selectedSupplier && (
+            <p>
+              <strong>מספר הזמנה חזוי:</strong>{" "}
+              {generateSupplierPrefix(selectedSupplier.name)}-
+              {String(new Date().getMonth() + 1).padStart(2, "0")}
+              {String(new Date().getFullYear()).slice(-2)}-XXX
             </p>
           )}
         </div>

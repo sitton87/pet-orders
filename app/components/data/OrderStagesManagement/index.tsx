@@ -79,9 +79,13 @@ export default function OrderStagesManagement() {
 
       if (!response.ok) throw new Error("Failed to update stage");
 
+      // 🆕 רענון מיידי של הטבלה
       await fetchStages();
       setEditingStage(null);
       setMessage({ type: "success", text: "שלב עודכן בהצלחה!" });
+
+      // 🆕 התראה לקומפוננטות אחרות
+      window.dispatchEvent(new CustomEvent("stagesUpdated"));
     } catch (error) {
       console.error("Error updating stage:", error);
       setMessage({ type: "error", text: "שגיאה בעדכון שלב" });

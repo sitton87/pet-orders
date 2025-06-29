@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-
 import {
   Calendar,
   DollarSign,
@@ -21,6 +20,11 @@ import FileUpload from "@/components/common/FileUpload";
 
 interface OrderCardProps {
   order: Order;
+  rowIndex: number;
+  openOrder: { id: string; type: "details" | "files"; row: number } | null;
+  setOpenOrder: (
+    value: { id: string; type: "details" | "files"; row: number } | null
+  ) => void;
   onEdit: (order: Order) => void;
   onDelete: (orderId: string) => Promise<void>;
   onViewGantt: (orderId: string) => void;
@@ -28,18 +32,81 @@ interface OrderCardProps {
 
 export default function OrderCard({
   order,
+  rowIndex,
+  openOrder,
+  setOpenOrder,
   onEdit,
   onDelete,
   onViewGantt,
 }: OrderCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [showFiles, setShowFiles] = useState(false);
+
+  // 🆕 State לניהול מיקום הכרטיס
+  const [cardRef, setCardRef] = useState<HTMLDivElement | null>(null);
+  const [shouldOpenUpward, setShouldOpenUpward] = useState(false);
 
   // 🆕 State לסטטוסים דינמיים
   const [availableStatuses, setAvailableStatuses] = useState<string[]>([]);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [currentStatus, setCurrentStatus] = useState(order.status);
+
+  // 🆕 חישוב מצב פתוח/סגור מה-state המשותף (כמו SupplierCard)
+  const showDetails =
+    openOrder?.id === order.id &&
+    openOrder?.type === "details" &&
+    openOrder?.row === rowIndex;
+  const showFiles =
+    openOrder?.id === order.id &&
+    openOrder?.type === "files" &&
+    openOrder?.row === rowIndex;
+
+  // 🆕 פונקציה לבדיקת מיקום הכרטיס
+  const checkPosition = () => {
+    if (!cardRef) return;
+
+    const cardRect = cardRef.getBoundingClientRect();
+    const windowHeight = window.innerHeight;
+
+    // אם הכרטיס נמצא בחצי התחתון של המסך
+    const shouldOpen = cardRect.bottom > windowHeight * 0.6;
+    setShouldOpenUpward(shouldOpen);
+  };
+
+  // 🆕 פונקציות לניהול פתיחה/סגירה (כמו SupplierCard)
+  const handleToggleDetails = () => {
+    if (showDetails) {
+      setOpenOrder(null);
+    } else {
+      checkPosition(); // בדוק מיקום לפני פתיחה
+      setOpenOrder({ id: order.id, type: "details", row: rowIndex });
+    }
+  };
+
+  const handleToggleFiles = () => {
+    if (showFiles) {
+      setOpenOrder(null);
+    } else {
+      checkPosition(); // בדוק מיקום לפני פתיחה
+      setOpenOrder({ id: order.id, type: "files", row: rowIndex });
+    }
+  };
+
+  // 🆕 טיפול במקש ESC (כמו SupplierCard)
+  useEffect(() => {
+    const handleEsc = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && (showDetails || showFiles)) {
+        setOpenOrder(null);
+      }
+    };
+
+    if (showDetails || showFiles) {
+      document.addEventListener("keydown", handleEsc);
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEsc);
+    };
+  }, [showDetails, showFiles, setOpenOrder]);
 
   // 🔄 טעינת סטטוסים זמינים
   useEffect(() => {
@@ -135,70 +202,84 @@ export default function OrderCard({
 
   return (
     <div
-      className={`bg-white rounded-lg shadow-md border border-gray-200 hover:shadow-lg transition-shadow duration-200 ${
-        isOverdue() ? "border-l-4 border-l-red-500" : ""
+      ref={setCardRef}
+      className={`rounded-lg shadow-md border transition-all duration-200 hover:shadow-lg ${
+        showDetails
+          ? "bg-blue-50 border-blue-300 shadow-blue-100 relative z-10"
+          : showFiles
+          ? "bg-blue-50 border-blue-200 shadow-blue-50 relative z-10"
+          : isOverdue()
+          ? "bg-white border-red-200 border-l-4 border-l-red-500"
+          : "bg-white border-gray-200"
       }`}
     >
-      {/* כותרת הכרטיס */}
-      <div className="p-6">
+      {/* כותרת הכרטיס - Responsive */}
+      <div className="p-4 lg:p-6">
         <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <div className="flex items-center space-x-3 mb-2">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {order.orderNumber}
-              </h3>
+          <div className="flex-1 min-w-0">
+            <div className="mb-2">
+              <div className="flex items-center space-x-2 lg:space-x-3 mb-2">
+                <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">
+                  {order.orderNumber}
+                </h3>
 
-              {/* 🆕 Dropdown לעדכון סטטוס */}
-              <div className="relative">
-                <select
-                  value={currentStatus}
-                  onChange={(e) => updateOrderStatus(e.target.value)}
-                  disabled={isUpdatingStatus}
-                  className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border cursor-pointer 
-                    ${getStatusColor(currentStatus)} 
-                    ${
-                      isUpdatingStatus
-                        ? "opacity-50 cursor-not-allowed"
-                        : "hover:shadow-sm"
-                    }
-                    focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1`}
-                >
-                  {availableStatuses.map((status) => (
-                    <option key={status} value={status}>
-                      {status}
-                    </option>
-                  ))}
-                </select>
-                {isUpdatingStatus && (
-                  <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
-                    <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+                {/* 🆕 Dropdown לעדכון סטטוס - Responsive */}
+                <div className="relative flex-shrink-0">
+                  <select
+                    value={currentStatus}
+                    onChange={(e) => updateOrderStatus(e.target.value)}
+                    disabled={isUpdatingStatus}
+                    className={`inline-flex items-center px-2 lg:px-3 py-1 rounded-full text-xs font-medium border cursor-pointer 
+                      ${getStatusColor(currentStatus)} 
+                      ${
+                        isUpdatingStatus
+                          ? "opacity-50 cursor-not-allowed"
+                          : "hover:shadow-sm"
+                      }
+                      focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1`}
+                  >
+                    {availableStatuses.map((status) => (
+                      <option key={status} value={status}>
+                        {status}
+                      </option>
+                    ))}
+                  </select>
+                  {isUpdatingStatus && (
+                    <div className="absolute left-0 top-0 w-full h-full flex items-center justify-center">
+                      <div className="animate-spin rounded-full h-3 w-3 border border-gray-400 border-t-transparent"></div>
+                    </div>
+                  )}
+                </div>
+
+                {isOverdue() && (
+                  <div className="flex items-center text-red-600 flex-shrink-0">
+                    <AlertTriangle className="h-3 w-3 lg:h-4 lg:w-4 mr-1" />
+                    <span className="text-xs font-medium hidden sm:inline">
+                      באיחור
+                    </span>
                   </div>
                 )}
               </div>
-
-              {isOverdue() && (
-                <div className="flex items-center text-red-600">
-                  <AlertTriangle className="h-4 w-4 mr-1" />
-                  <span className="text-xs font-medium">באיחור</span>
-                </div>
-              )}
             </div>
 
-            <div className="space-y-2 text-sm text-gray-600">
+            {/* פרטי יצירת קשר - Responsive */}
+            <div className="space-y-1 lg:space-y-2 text-xs lg:text-sm text-gray-600">
               <div className="flex items-center space-x-2">
-                <Package className="h-4 w-4 text-gray-400" />
-                <span>ספק: {order.supplierName || "לא צוין"}</span>
+                <Package className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400 flex-shrink-0" />
+                <span className="truncate">
+                  ספק: {order.supplierName || "לא צוין"}
+                </span>
               </div>
               <div className="flex items-center space-x-2">
-                <Calendar className="h-4 w-4 text-gray-400" />
-                <span>
+                <Calendar className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400 flex-shrink-0" />
+                <span className="truncate">
                   תאריך הגעה רצוי:{" "}
                   {new Date(order.etaFinal).toLocaleDateString("he-IL")}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
-                <DollarSign className="h-4 w-4 text-gray-400" />
-                <span>
+                <DollarSign className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400 flex-shrink-0" />
+                <span className="truncate">
                   {formatCurrency(
                     Number(order.totalAmount),
                     order.originalCurrency
@@ -208,49 +289,57 @@ export default function OrderCard({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
+          {/* כפתורי פעולה - Responsive */}
+          <div className="flex items-center space-x-1 lg:space-x-2 flex-shrink-0">
             <button
-              onClick={() => setShowFiles(!showFiles)}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-              title="קבצים"
+              onClick={handleToggleFiles}
+              disabled={showDetails}
+              className={`p-1.5 lg:p-2 rounded-md transition-colors ${
+                showDetails
+                  ? "text-gray-400 cursor-not-allowed"
+                  : "text-blue-600 hover:bg-blue-50"
+              }`}
+              title={showDetails ? "לא זמין כשפרטים נוספים פתוח" : "קבצים"}
             >
-              <FileText className="h-4 w-4" />
+              <FileText className="h-3 w-3 lg:h-4 lg:w-4" />
             </button>
             <button
               onClick={() => onViewGantt(order.id)}
-              className="p-2 text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
+              className="p-1.5 lg:p-2 text-purple-600 hover:bg-purple-50 rounded-md transition-colors"
               title="צפה בלוח שנה"
             >
-              <Eye className="h-4 w-4" />
+              <Eye className="h-3 w-3 lg:h-4 lg:w-4" />
             </button>
             <button
               onClick={() => onEdit(order)}
-              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              className="p-1.5 lg:p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
               title="ערוך"
             >
-              <Edit className="h-4 w-4" />
+              <Edit className="h-3 w-3 lg:h-4 lg:w-4" />
             </button>
             <button
               onClick={() => setShowDeleteConfirm(true)}
-              className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+              className="p-1.5 lg:p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
               title="מחק"
             >
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-3 w-3 lg:h-4 lg:w-4" />
             </button>
           </div>
         </div>
 
-        {/* מידע מהיר */}
-        <div className="mt-4 flex items-center justify-between">
-          <div className="flex items-center space-x-4 text-sm">
+        {/* מידע מהיר - Responsive */}
+        <div className="mt-3 lg:mt-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2 lg:gap-0">
+          <div className="flex flex-wrap items-center gap-2 lg:gap-4 text-xs lg:text-sm">
             {order.containerNumber && (
-              <div className="flex items-center space-x-1">
-                <Truck className="h-4 w-4 text-gray-400" />
-                <span className="text-gray-600">{order.containerNumber}</span>
+              <div className="flex items-center space-x-1 flex-shrink-0">
+                <Truck className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400" />
+                <span className="text-gray-600 whitespace-nowrap">
+                  {order.containerNumber}
+                </span>
               </div>
             )}
             {order.advanceAmount && Number(order.advanceAmount) > 0 && (
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+              <span className="inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                 מקדמה:{" "}
                 {formatCurrency(
                   Number(order.advanceAmount),
@@ -261,30 +350,36 @@ export default function OrderCard({
           </div>
 
           <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="flex items-center space-x-1 text-blue-600 hover:text-blue-800 transition-colors"
+            onClick={handleToggleDetails}
+            className="flex items-center justify-center lg:justify-start space-x-1 text-blue-600 hover:text-blue-800 transition-colors py-1 lg:py-0"
           >
-            <span className="text-sm">פרטים נוספים</span>
+            <span className="text-xs lg:text-sm">פרטים נוספים</span>
             {showDetails ? (
-              <ChevronUp className="h-4 w-4" />
+              <ChevronUp className="h-3 w-3 lg:h-4 lg:w-4" />
             ) : (
-              <ChevronDown className="h-4 w-4" />
+              <ChevronDown className="h-3 w-3 lg:h-4 lg:w-4" />
             )}
           </button>
         </div>
       </div>
 
-      {/* פרטים מורחבים */}
+      {/* פרטים מורחבים - Responsive */}
       {showDetails && (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-4 space-y-4">
+        <div
+          className={`absolute left-0 right-0 bg-blue-50 border border-blue-300 shadow-lg z-20 px-4 lg:px-6 py-4 lg:py-6 ${
+            shouldOpenUpward
+              ? "bottom-full border-b-0 rounded-t-lg"
+              : "top-full border-t-0 rounded-b-lg"
+          }`}
+        >
+          <div className="space-y-3 lg:space-y-4">
             {/* פרטים כספיים */}
             <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-2">
+              <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-2">
                 פרטים כספיים
               </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-green-50 rounded-md p-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-4 text-xs lg:text-sm">
+                <div className="bg-green-50 rounded-md p-2 lg:p-3 border border-green-200">
                   <div className="font-medium text-green-900">סכום כולל</div>
                   <div className="text-green-700">
                     {formatCurrency(
@@ -294,7 +389,7 @@ export default function OrderCard({
                   </div>
                 </div>
                 {order.advanceAmount && Number(order.advanceAmount) > 0 && (
-                  <div className="bg-blue-50 rounded-md p-3">
+                  <div className="bg-blue-50 rounded-md p-2 lg:p-3 border border-blue-200">
                     <div className="font-medium text-blue-900">מקדמה</div>
                     <div className="text-blue-700">
                       {formatCurrency(
@@ -306,7 +401,7 @@ export default function OrderCard({
                 )}
                 {order.finalPaymentAmount &&
                   Number(order.finalPaymentAmount) > 0 && (
-                    <div className="bg-purple-50 rounded-md p-3">
+                    <div className="bg-purple-50 rounded-md p-2 lg:p-3 border border-purple-200">
                       <div className="font-medium text-purple-900">
                         תשלום סופי
                       </div>
@@ -319,7 +414,7 @@ export default function OrderCard({
                     </div>
                   )}
                 {order.exchangeRate && Number(order.exchangeRate) > 0 && (
-                  <div className="bg-orange-50 rounded-md p-3">
+                  <div className="bg-orange-50 rounded-md p-2 lg:p-3 border border-orange-200">
                     <div className="font-medium text-orange-900">
                       שער חליפין
                     </div>
@@ -334,10 +429,10 @@ export default function OrderCard({
             {/* פרטי משלוח */}
             {(order.containerNumber || order.portReleaseCost) && (
               <div>
-                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-2">
                   פרטי משלוח
                 </h4>
-                <div className="bg-gray-50 rounded-md p-3 text-sm space-y-2">
+                <div className="bg-gray-50 rounded-md p-2 lg:p-3 text-xs lg:text-sm space-y-1 lg:space-y-2 border border-gray-200">
                   {order.containerNumber && (
                     <div className="flex justify-between">
                       <span className="text-gray-600">מספר קונטיינר:</span>
@@ -362,10 +457,10 @@ export default function OrderCard({
             {/* הערות */}
             {order.notes && (
               <div>
-                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-2">
                   הערות
                 </h4>
-                <div className="bg-yellow-50 rounded-md p-3 text-sm text-yellow-800">
+                <div className="bg-yellow-50 rounded-md p-2 lg:p-3 text-xs lg:text-sm text-yellow-800 border border-yellow-200">
                   {order.notes}
                 </div>
               </div>
@@ -373,17 +468,17 @@ export default function OrderCard({
 
             {/* תאריכים */}
             <div>
-              <h4 className="text-sm font-medium text-gray-900 mb-2">
+              <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-2">
                 תאריכים
               </h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="bg-gray-50 rounded-md p-3">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 lg:gap-4 text-xs lg:text-sm">
+                <div className="bg-gray-50 rounded-md p-2 lg:p-3 border border-gray-200">
                   <div className="font-medium text-gray-900">תאריך יצירה</div>
                   <div className="text-gray-700">
                     {new Date(order.createdAt).toLocaleDateString("he-IL")}
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-md p-3">
+                <div className="bg-gray-50 rounded-md p-2 lg:p-3 border border-gray-200">
                   <div className="font-medium text-gray-900">ETA סופי</div>
                   <div className="text-gray-700">
                     {new Date(order.etaFinal).toLocaleDateString("he-IL")}
@@ -391,16 +486,35 @@ export default function OrderCard({
                 </div>
               </div>
             </div>
+
+            {/* תאריכים נוספים */}
+            <div className="mt-3 lg:mt-4 pt-2 lg:pt-3 border-t border-gray-200 text-xs text-gray-500 flex flex-col sm:flex-row sm:justify-between gap-1">
+              <span>
+                נוצר: {new Date(order.createdAt).toLocaleDateString("he-IL")}
+              </span>
+              <span>
+                עודכן:{" "}
+                {new Date(
+                  order.updatedAt || order.createdAt
+                ).toLocaleDateString("he-IL")}
+              </span>
+            </div>
           </div>
         </div>
       )}
 
-      {/* קבצים מצורפים */}
-      {showFiles && (
-        <div className="px-6 pb-6 border-t border-gray-100">
-          <div className="pt-4">
-            <h4 className="text-sm font-medium text-gray-900 mb-4 flex items-center">
-              <Upload className="h-4 w-4 mr-2" />
+      {/* תצוגת מסמכים - Responsive */}
+      {showFiles && !showDetails && (
+        <div
+          className={`absolute left-0 right-0 bg-blue-50 border border-blue-200 shadow-lg z-20 px-4 lg:px-6 py-4 lg:py-6 ${
+            shouldOpenUpward
+              ? "bottom-full border-b-0 rounded-t-lg"
+              : "top-full border-t-0 rounded-b-lg"
+          }`}
+        >
+          <div>
+            <h4 className="text-xs lg:text-sm font-medium text-gray-900 mb-3 lg:mb-4 flex items-center">
+              <Upload className="h-3 w-3 lg:h-4 lg:w-4 mr-2" />
               קבצים מצורפים
             </h4>
             <FileUpload
@@ -414,27 +528,27 @@ export default function OrderCard({
         </div>
       )}
 
-      {/* דיאלוג אישור מחיקה */}
+      {/* דיאלוג אישור מחיקה - Responsive */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg p-4 lg:p-6 max-w-md w-full">
+            <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-3 lg:mb-4">
               אישור מחיקה
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-sm lg:text-base text-gray-600 mb-4 lg:mb-6">
               האם אתה בטוח שברצונך למחוק את ההזמנה "{order.orderNumber}"? פעולה
               זו לא ניתנת לביטול.
             </p>
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end space-x-3 lg:space-x-4">
               <button
                 onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-gray-600 hover:text-gray-800 transition-colors"
+                className="px-3 lg:px-4 py-1.5 lg:py-2 text-sm lg:text-base text-gray-600 hover:text-gray-800 transition-colors"
               >
                 בטל
               </button>
               <button
                 onClick={handleDelete}
-                className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                className="px-3 lg:px-4 py-1.5 lg:py-2 text-sm lg:text-base bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
               >
                 מחק
               </button>

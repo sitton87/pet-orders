@@ -17,10 +17,15 @@ export async function GET() {
 export async function PUT(request: NextRequest) {
   try {
     const data = await request.json();
-
     if (!data.id) {
       return NextResponse.json({ error: "מזהה שלב חסר" }, { status: 400 });
     }
+
+    // 🆕 הוסף את השורות האלה:
+    // שמור את השם הישן
+    const oldTemplate = await prisma.orderStageTemplate.findUnique({
+      where: { id: data.id },
+    });
 
     const updatedStage = await prisma.orderStageTemplate.update({
       where: { id: data.id },
@@ -36,6 +41,19 @@ export async function PUT(request: NextRequest) {
         description: data.description,
       },
     });
+
+    // 🆕 הוסף את השורות האלה:
+    // עדכון שלבים קיימים אם השם השתנה
+    if (oldTemplate && oldTemplate.name !== data.name) {
+      await prisma.orderPhase.updateMany({
+        where: { templateId: data.id },
+        data: { phaseName: data.name },
+      });
+
+      console.log(
+        `✅ Updated existing phases from "${oldTemplate.name}" to "${data.name}"`
+      );
+    }
 
     return NextResponse.json(updatedStage);
   } catch (error) {

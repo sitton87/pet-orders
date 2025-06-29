@@ -15,7 +15,7 @@ export async function GET() {
 
     // המרה לפורמט נוח
     const settingsObject: any = {};
-    settings.forEach((setting) => {
+    settings.forEach((setting: any) => {
       if (setting.type === "json") {
         try {
           settingsObject[setting.key] = JSON.parse(setting.value);

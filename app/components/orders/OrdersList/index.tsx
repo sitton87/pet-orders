@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Search, Plus, Filter } from "lucide-react";
+import { Search, Plus, Filter, Eye, EyeOff } from "lucide-react";
 import OrderCard from "../OrderCard";
 import AddOrderModal from "../AddOrderModal";
 import EditOrderModal from "../EditOrderModal";
@@ -24,15 +24,38 @@ export default function OrdersList({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
   const [supplierFilter, setSupplierFilter] = useState("");
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
 
+  // 🆕 State משותף לניהול פתיחה/סגירה של כרטיסי הזמנות (כמו SupplierCard)
+  const [openOrder, setOpenOrder] = useState<{
+    id: string;
+    type: "details" | "files";
+    row: number;
+  } | null>(null);
+
+  // 🆕 תיבת סימון להצגת הושלם/מבוטלת
+  const [showCompletedCancelled, setShowCompletedCancelled] = useState(false);
+
+  // 🆕 סינון מתקדם עם תיבות סימון לסטטוסים
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
+    new Set()
+  );
+  const [isStatusFilterExpanded, setIsStatusFilterExpanded] = useState(false);
+
   // עדכון כשהProps משתנות
   useEffect(() => {
     setOrders(initialOrders);
+
+    // 🆕 אתחול ברירת מחדל לסטטוסים (הכל חוץ מהושלם ומבוטלת)
+    const defaultStatuses = new Set(
+      Array.from(new Set(initialOrders.map((order) => order.status))).filter(
+        (status) => status !== "הושלם" && status !== "מבוטלת"
+      )
+    );
+    setSelectedStatuses(defaultStatuses);
   }, [initialOrders]);
 
   const fetchOrders = async () => {
@@ -91,13 +114,11 @@ export default function OrdersList({
     try {
       console.log("Updating order:", orderData);
 
-      // וודא שיש ID להזמנה
       if (!orderData.id) {
         throw new Error("מזהה הזמנה חסר");
       }
 
       const response = await fetch(`/api/orders?id=${orderData.id}`, {
-        // ← הוסף ID כאן!
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -150,17 +171,44 @@ export default function OrdersList({
   };
 
   const handleViewGantt = (orderId: string) => {
-    // אם יש פונקציה מהחוץ - השתמש בה
     if (onViewGantt) {
       onViewGantt(orderId);
     } else {
-      // fallback ישן
       console.log("View Gantt for order:", orderId);
       alert("תצוגת גאנט תתווסף בהמשך");
     }
   };
 
-  // סינון הזמנות
+  // 🆕 פונקציות לטיפול בסינון סטטוסים
+  const handleStatusToggle = (status: string) => {
+    const newStatuses = new Set(selectedStatuses);
+    if (newStatuses.has(status)) {
+      newStatuses.delete(status);
+    } else {
+      newStatuses.add(status);
+    }
+    setSelectedStatuses(newStatuses);
+  };
+
+  const handleSelectAllStatuses = () => {
+    const allStatuses = new Set(orders.map((order) => order.status));
+    setSelectedStatuses(allStatuses);
+  };
+
+  const handleClearAllStatuses = () => {
+    setSelectedStatuses(new Set());
+  };
+
+  const handleResetToDefault = () => {
+    const defaultStatuses = new Set(
+      Array.from(new Set(orders.map((order) => order.status))).filter(
+        (status) => status !== "הושלם" && status !== "מבוטלת"
+      )
+    );
+    setSelectedStatuses(defaultStatuses);
+  };
+
+  // 🆕 סינון הזמנות מעודכן
   const filteredOrders = orders.filter((order) => {
     const matchesSearch =
       order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -168,20 +216,40 @@ export default function OrdersList({
       order.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       order.containerNumber?.toLowerCase().includes(searchTerm.toLowerCase());
 
-    const matchesStatus = !statusFilter || order.status === statusFilter;
     const matchesSupplier =
       !supplierFilter || order.supplierId === supplierFilter;
 
-    return matchesSearch && matchesStatus && matchesSupplier;
+    // 🆕 לוגיקת הצגת הושלם/מבוטלת
+    const isCompletedOrCancelled =
+      order.status === "הושלם" || order.status === "מבוטלת";
+
+    // אם הזמנה היא הושלם/מבוטלת - הצג רק אם התיבה מסומנת
+    if (isCompletedOrCancelled) {
+      return showCompletedCancelled && matchesSearch && matchesSupplier;
+    }
+
+    // 🆕 סינון לפי סטטוסים נבחרים (רק להזמנות שאינן הושלם/מבוטלת)
+    const matchesStatus = selectedStatuses.has(order.status);
+
+    return matchesSearch && matchesSupplier && matchesStatus;
   });
 
-  // רשימת סטטוסים ייחודיים
+  // רשימת סטטוסים ייחודיים (ללא הושלם ומבוטלת לסינון)
   const uniqueStatuses = Array.from(
     new Set(orders.map((order) => order.status))
-  );
+  )
+    .filter((status) => status !== "הושלם" && status !== "מבוטלת")
+    .sort();
+
   const uniqueSuppliers = Array.from(
     new Set(orders.map((order) => order.supplierName))
   );
+
+  // 🆕 ספירת הזמנות לפי סטטוס
+  const statusCounts: { [key: string]: number } = {};
+  orders.forEach((order) => {
+    statusCounts[order.status] = (statusCounts[order.status] || 0) + 1;
+  });
 
   if (loading) {
     return (
@@ -224,7 +292,7 @@ export default function OrdersList({
   return (
     <div>
       {/* כותרת וכפתור הוספה */}
-      <div className="flex flex-col flex-row justify-between items-start items-center mb-6">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-1">
             רשימת הזמנות
@@ -235,7 +303,7 @@ export default function OrdersList({
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="mt-3 mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+          className="mt-3 lg:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
         >
           <Plus className="h-4 w-4 ml-2" />
           הוסף הזמנה חדשה
@@ -258,24 +326,25 @@ export default function OrdersList({
           />
         </div>
 
-        {/* סינונים */}
-        <div className="flex flex-wrap gap-4">
-          <div className="flex items-center space-x-2">
-            <Filter className="h-4 w-4 text-gray-400" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">כל הסטטוסים</option>
-              {uniqueStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
-          </div>
+        {/* שורת בקרים */}
+        <div className="flex flex-wrap gap-4 items-center">
+          {/* 🆕 תיבת סימון להצגת הושלם/מבוטלת */}
+          <label className="flex items-center space-x-2 text-sm">
+            <input
+              type="checkbox"
+              checked={showCompletedCancelled}
+              onChange={(e) => setShowCompletedCancelled(e.target.checked)}
+              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span className="text-gray-700">הצג הושלם ומבוטלת</span>
+            {showCompletedCancelled ? (
+              <Eye className="h-4 w-4 text-green-600" />
+            ) : (
+              <EyeOff className="h-4 w-4 text-gray-400" />
+            )}
+          </label>
 
+          {/* סינון ספק */}
           <div>
             <select
               value={supplierFilter}
@@ -291,12 +360,24 @@ export default function OrdersList({
             </select>
           </div>
 
-          {(statusFilter || supplierFilter || searchTerm) && (
+          {/* 🆕 כפתור סינון סטטוסים */}
+          <button
+            onClick={() => setIsStatusFilterExpanded(!isStatusFilterExpanded)}
+            className="flex items-center space-x-2 px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
+          >
+            <Filter className="h-4 w-4" />
+            <span>סינון סטטוסים ({selectedStatuses.size})</span>
+          </button>
+
+          {/* כפתור ניקוי סינונים */}
+          {(supplierFilter ||
+            searchTerm ||
+            selectedStatuses.size !== uniqueStatuses.length) && (
             <button
               onClick={() => {
-                setStatusFilter("");
                 setSupplierFilter("");
                 setSearchTerm("");
+                handleResetToDefault();
               }}
               className="text-sm text-blue-600 hover:text-blue-700"
             >
@@ -304,6 +385,69 @@ export default function OrdersList({
             </button>
           )}
         </div>
+
+        {/* 🆕 תיבות סימון לסטטוסים */}
+        {isStatusFilterExpanded && (
+          <div className="bg-gray-50 p-4 rounded-lg border">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-medium text-gray-900">
+                בחר סטטוסים להצגה:
+              </h4>
+              <div className="flex space-x-2 text-xs">
+                <button
+                  onClick={handleSelectAllStatuses}
+                  className="text-blue-600 hover:text-blue-700"
+                >
+                  בחר הכל
+                </button>
+                <span className="text-gray-400">|</span>
+                <button
+                  onClick={handleClearAllStatuses}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  בטל הכל
+                </button>
+                <span className="text-gray-400">|</span>
+                <button
+                  onClick={handleResetToDefault}
+                  className="text-green-600 hover:text-green-700"
+                >
+                  ברירת מחדל
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+              {uniqueStatuses.map((status) => (
+                <label
+                  key={status}
+                  className={`flex items-center space-x-2 p-2 rounded border cursor-pointer transition-colors ${
+                    selectedStatuses.has(status)
+                      ? "bg-blue-50 border-blue-200"
+                      : "bg-white border-gray-200 hover:bg-gray-50"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={selectedStatuses.has(status)}
+                    onChange={() => handleStatusToggle(status)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm text-gray-700 flex-1">{status}</span>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      selectedStatuses.has(status)
+                        ? "bg-blue-100 text-blue-800"
+                        : "bg-gray-100 text-gray-600"
+                    }`}
+                  >
+                    {statusCounts[status] || 0}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* רשימת הזמנות */}
@@ -323,31 +467,40 @@ export default function OrdersList({
             />
           </svg>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm || statusFilter || supplierFilter
+            {searchTerm ||
+            supplierFilter ||
+            selectedStatuses.size < uniqueStatuses.length
               ? "לא נמצאו הזמנות"
               : "אין הזמנות במערכת"}
           </h3>
           <p className="text-gray-600 mb-4">
-            {searchTerm || statusFilter || supplierFilter
-              ? "לא נמצאו הזמנות התואמות לסינונים"
+            {searchTerm ||
+            supplierFilter ||
+            selectedStatuses.size < uniqueStatuses.length
+              ? "לא נמצאו הזמנות התואמות לסינונים שנבחרו"
               : "התחל בהוספת הזמנה ראשונה למערכת"}
           </p>
-          {!searchTerm && !statusFilter && !supplierFilter && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Plus className="h-4 w-4 ml-2" />
-              הוסף הזמנה ראשונה
-            </button>
-          )}
+          {!searchTerm &&
+            !supplierFilter &&
+            selectedStatuses.size === uniqueStatuses.length && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="h-4 w-4 ml-2" />
+                הוסף הזמנה ראשונה
+              </button>
+            )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredOrders.map((order) => (
+          {filteredOrders.map((order, index) => (
             <OrderCard
               key={order.id}
               order={order}
+              rowIndex={index}
+              openOrder={openOrder}
+              setOpenOrder={setOpenOrder}
               onEdit={handleEditOrder}
               onDelete={handleDeleteOrder}
               onViewGantt={handleViewGantt}

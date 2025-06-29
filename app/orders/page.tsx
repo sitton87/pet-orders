@@ -144,10 +144,13 @@ export default function OrdersPage() {
       <div className="w-full px-4 py-8 mt-16">
         {/* כותרת העמוד */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            ניהול הזמנות
-          </h1>
-          <p className="text-gray-600">מעקב ועדכון הזמנות, שלבי ייצור ושילוח</p>
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gray-900">ניהול הזמנות</h1>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <p className="text-gray-600">
+              מעקב ועדכון הזמנות, שלבי ייצור ושילוח
+            </p>
+          </div>
         </div>
 
         {/* KPIs עם נתונים אמיתיים */}

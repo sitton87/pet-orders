@@ -5,37 +5,16 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import { Calendar, ChevronLeft, ChevronRight, X, Filter } from "lucide-react";
-
-// Types ללוח שנה
-interface CalendarOrder {
-  id: string;
-  orderNumber: string;
-  supplierName: string;
-  totalAmount: number;
-  createdAt: string;
-  etaFinal: string;
-  stages: CalendarStage[];
-}
-
-interface CalendarStage {
-  id: string;
-  name: string;
-  category: "payment" | "shipping" | "approval" | "production" | "delivery";
-  status: "completed" | "in-progress" | "pending" | "cancelled";
-  plannedStartDate: string;
-  actualStartDate?: string;
-  plannedEndDate: string;
-  actualEndDate?: string;
-}
-
-interface DayTasks {
-  date: Date;
-  tasks: Array<{
-    stage: CalendarStage;
-    orderNumber: string;
-    supplierName: string;
-  }>;
-}
+import {
+  CalendarOrder,
+  DayGroupedTasks,
+  GroupedStageData,
+  generateGroupedCalendarDays,
+  getDayIntensity,
+  groupPaymentsByType,
+  getStageConfigs,
+  PAYMENT_COLORS,
+} from "./utils";
 
 export default function CalendarPage() {
   const { data: session, status } = useSession();
@@ -44,8 +23,10 @@ export default function CalendarPage() {
   const [loading, setLoading] = useState(true);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-  const [selectedDay, setSelectedDay] = useState<DayTasks | null>(null);
+  const [selectedDay, setSelectedDay] = useState<DayGroupedTasks | null>(null);
   const [stageFilters, setStageFilters] = useState<Record<string, boolean>>({});
+  const [stageConfigs, setStageConfigs] = useState<any[]>([]);
+  const [calendarDays, setCalendarDays] = useState<DayGroupedTasks[]>([]);
 
   // Authentication check
   useEffect(() => {
@@ -55,23 +36,33 @@ export default function CalendarPage() {
     }
   }, [session, status, router]);
 
-  // Fetch orders data
+  // 🆕 1. תיקון - טעינה ראשונית עם החודש הנוכחי
   useEffect(() => {
-    fetchOrders();
+    const initializeCalendar = async () => {
+      await fetchOrders();
+      // הקלנדר יתעדכן אוטומטית ב-useEffect האחר כשorders יטענו
+    };
+
+    initializeCalendar();
   }, []);
 
   const fetchOrders = async () => {
     try {
+      setLoading(true);
       const response = await fetch("/api/calendar/orders");
       if (response.ok) {
         const data = await response.json();
         console.log("📅 CALENDAR DEBUG - Orders received:", data);
         setOrders(data);
 
+        // טען קונפיגורציית שלבים דינמית
+        const configs = await getStageConfigs();
+        setStageConfigs(configs);
+
         // Initialize stage filters - all stages enabled by default
         const allStages = data.flatMap((order: CalendarOrder) => order.stages);
         const uniqueStages = Array.from(
-          new Set(allStages.map((stage: CalendarStage) => stage.name))
+          new Set(allStages.map((stage: any) => stage.name))
         ) as string[];
         const initialFilters: Record<string, boolean> = {};
         uniqueStages.forEach((stageName: string) => {
@@ -86,93 +77,34 @@ export default function CalendarPage() {
     }
   };
 
-  // Get category display name for stage
-  const getStageCategory = (stage: CalendarStage): string => {
-    const categoryMap: Record<string, string> = {
-      payment: "כספים",
-      production: "ייצור",
-      shipping: "שילוח ונמל",
-      delivery: "שילוח ונמל",
-      approval: "אישורים ואחרים",
-    };
-    return categoryMap[stage.category] || "אישורים ואחרים";
-  };
-
-  // Get color for category
-  const getCategoryColor = (category: string): string => {
-    const colorMap: Record<string, string> = {
-      כספים: "bg-green-500 text-white",
-      ייצור: "bg-orange-500 text-white",
-      "שילוח ונמל": "bg-blue-500 text-white",
-      "אישורים ואחרים": "bg-purple-500 text-white",
-    };
-    return colorMap[category] || "bg-gray-500 text-white";
-  };
-
-  // Generate calendar days for selected month
-  const generateCalendarDays = (): DayTasks[] => {
-    const firstDay = new Date(selectedYear, selectedMonth, 1);
-    const lastDay = new Date(selectedYear, selectedMonth + 1, 0);
-    const days: DayTasks[] = [];
-
-    for (let day = 1; day <= lastDay.getDate(); day++) {
-      const currentDate = new Date(selectedYear, selectedMonth, day);
-      const dayTasks = getTasksForDate(currentDate);
-      days.push({
-        date: currentDate,
-        tasks: dayTasks,
-      });
-    }
-
-    return days;
-  };
-
-  // Get tasks for specific date
-  const getTasksForDate = (
-    date: Date
-  ): Array<{
-    stage: CalendarStage;
-    orderNumber: string;
-    supplierName: string;
-  }> => {
-    const tasks: Array<{
-      stage: CalendarStage;
-      orderNumber: string;
-      supplierName: string;
-    }> = [];
-
-    orders.forEach((order) => {
-      order.stages.forEach((stage) => {
-        // Check if stage filter is enabled
-        if (!stageFilters[stage.name]) return;
-
-        const stageStart = new Date(
-          stage.actualStartDate || stage.plannedStartDate
+  // עדכון נתוני הלוח שנה
+  useEffect(() => {
+    const updateCalendar = async () => {
+      if (orders.length > 0) {
+        const days = await generateGroupedCalendarDays(
+          selectedYear,
+          selectedMonth,
+          orders,
+          stageFilters
         );
-        const stageEnd = new Date(stage.actualEndDate || stage.plannedEndDate);
+        setCalendarDays(days);
+      }
+    };
+    updateCalendar();
+  }, [selectedYear, selectedMonth, orders, stageFilters]);
 
-        // Check if stage is active on this date
-        if (date >= stageStart && date <= stageEnd) {
-          tasks.push({
-            stage,
-            orderNumber: order.orderNumber,
-            supplierName: order.supplierName,
-          });
-        }
-      });
-    });
+  // האזנה לעדכונים משלבים
+  useEffect(() => {
+    const handleStageUpdate = async () => {
+      console.log("🔄 Stages updated - refreshing calendar");
+      const configs = await getStageConfigs(true); // רענון מאולץ
+      setStageConfigs(configs);
+      fetchOrders(); // רענון הזמנות
+    };
 
-    return tasks;
-  };
-
-  // Get intensity color for day based on task count
-  const getDayIntensity = (taskCount: number): string => {
-    if (taskCount === 0) return "bg-white hover:bg-gray-50";
-    if (taskCount <= 2) return "bg-blue-100 hover:bg-blue-150";
-    if (taskCount <= 5) return "bg-blue-200 hover:bg-blue-250";
-    if (taskCount <= 8) return "bg-blue-300 hover:bg-blue-350";
-    return "bg-blue-400 hover:bg-blue-450 text-white";
-  };
+    window.addEventListener("stagesUpdated", handleStageUpdate);
+    return () => window.removeEventListener("stagesUpdated", handleStageUpdate);
+  }, []);
 
   // Month names in Hebrew
   const monthNames = [
@@ -193,6 +125,30 @@ export default function CalendarPage() {
   // Day names in Hebrew
   const dayNames = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
 
+  // 🆕 5. פונקציה לחישוב סכום כספי יומי
+  const calculateDailyPayments = (
+    dayData: DayGroupedTasks
+  ): { amount: number; currency: string } | null => {
+    let totalAmount = 0;
+    let currency = "USD"; // ברירת מחדל
+
+    dayData.stageGroups.forEach((group) => {
+      if (group.category === "payments") {
+        group.orders.forEach((item: any) => {
+          if (item.amount) {
+            totalAmount += item.amount;
+            // קח את המטבע מההזמנה הראשונה
+            if (item.order.originalCurrency) {
+              currency = item.order.originalCurrency;
+            }
+          }
+        });
+      }
+    });
+
+    return totalAmount > 0 ? { amount: totalAmount, currency } : null;
+  };
+
   if (status === "loading" || loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -205,7 +161,6 @@ export default function CalendarPage() {
     return null;
   }
 
-  const calendarDays = generateCalendarDays();
   const allStageNames = Array.from(
     new Set(orders.flatMap((order) => order.stages.map((stage) => stage.name)))
   );
@@ -215,16 +170,15 @@ export default function CalendarPage() {
       <Navbar />
 
       <div className="w-full px-4 py-8 mt-16">
-        {" "}
-        {/* Header */}
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">
-              לוח שנה - שלבי הזמנות
-            </h1>
-            <p className="text-gray-600 mt-2">תצוגת שלבים לפי תאריכים</p>
+        {/* כותרת העמוד */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4">
+            <h1 className="text-3xl font-bold text-gray-900">לוח שנה</h1>
+            <div className="h-6 w-px bg-gray-300"></div>
+            <p className="text-gray-600">מעקב שלבים לפי קטגוריות </p>
           </div>
         </div>
+
         <div className="grid grid-cols-4 gap-8">
           {/* Sidebar - Controls and Filters */}
           <div className="col-span-1">
@@ -381,54 +335,79 @@ export default function CalendarPage() {
                 {Array.from({
                   length: new Date(selectedYear, selectedMonth, 1).getDay(),
                 }).map((_, index) => (
-                  <div key={`empty-${index}`} className="h-24"></div>
+                  <div key={`empty-${index}`} className="h-32"></div>
                 ))}
 
                 {/* Month days */}
-                {calendarDays.map((dayData, index) => (
-                  <div
-                    key={index}
-                    onClick={() =>
-                      dayData.tasks.length > 0 ? setSelectedDay(dayData) : null
-                    }
-                    className={`h-24 border border-gray-200 p-2 transition-all duration-200 ${getDayIntensity(
-                      dayData.tasks.length
-                    )} ${
-                      dayData.tasks.length > 0
-                        ? "cursor-pointer hover:shadow-md"
-                        : "cursor-default"
-                    }`}
-                  >
+                {calendarDays.map((dayData, index) => {
+                  const dailyPayments = calculateDailyPayments(dayData);
+
+                  return (
                     <div
-                      className={`text-sm font-medium mb-1 ${
-                        dayData.tasks.length > 8
-                          ? "text-white"
-                          : "text-gray-900"
+                      key={index}
+                      onClick={() =>
+                        dayData.totalCount > 0 ? setSelectedDay(dayData) : null
+                      }
+                      className={`h-32 border border-gray-200 p-2 transition-all duration-200 relative ${getDayIntensity(
+                        dayData.totalCount
+                      )} ${
+                        dayData.totalCount > 0
+                          ? "cursor-pointer hover:shadow-md"
+                          : "cursor-default"
                       }`}
                     >
-                      {dayData.date.getDate()}
-                    </div>
-                    {dayData.tasks.length > 0 && (
-                      <div
-                        className={`text-xs font-medium ${
-                          dayData.tasks.length > 8
-                            ? "text-blue-100"
-                            : "text-blue-700"
-                        }`}
-                      >
-                        {dayData.tasks.length} משימות
+                      {/* 🆕 5. תצוגת תאריך עם סכום כספי */}
+                      <div className="flex justify-between items-start mb-2">
+                        <div
+                          className={`text-sm font-medium ${
+                            dayData.totalCount > 8
+                              ? "text-white"
+                              : "text-gray-900"
+                          }`}
+                        >
+                          {dayData.date.getDate()}
+                        </div>
+
+                        {/* תצוגת סכום כספי */}
+                        {dailyPayments && (
+                          <div className="bg-green-100 text-green-800 text-xs px-1 py-0.5 rounded font-medium">
+                            {dailyPayments.amount.toLocaleString()}{" "}
+                            {dailyPayments.currency}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                ))}
+
+                      {/* תצוגה מקובצת של שלבים */}
+                      <div className="space-y-1">
+                        {dayData.stageGroups.slice(0, 3).map((group) => (
+                          <div
+                            key={group.category}
+                            className="text-xs bg-white bg-opacity-90 rounded px-1 py-0.5 border"
+                          >
+                            <span className="font-medium">
+                              {group.displayName}
+                            </span>
+                            <span className="ml-1">({group.count})</span>
+                          </div>
+                        ))}
+                        {dayData.stageGroups.length > 3 && (
+                          <div className="text-xs text-gray-600">
+                            +{dayData.stageGroups.length - 3} עוד...
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </div>
+
         {/* Day Details Modal */}
         {selectedDay && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-6 max-w-3xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-xl font-bold text-gray-900">
                   {selectedDay.date.toLocaleDateString("he-IL", {
@@ -446,87 +425,163 @@ export default function CalendarPage() {
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto space-y-3">
-                {selectedDay.tasks.map((task, index) => {
-                  const category = getStageCategory(task.stage);
-                  const colorClass = getCategoryColor(category);
-
-                  return (
-                    <div
-                      key={index}
-                      className="border border-gray-200 rounded-lg p-4 hover:shadow-sm transition-shadow"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <span
-                          className={`px-3 py-1 rounded-full text-sm font-medium ${colorClass}`}
-                        >
-                          {task.stage.name}
-                        </span>
-                        <span className="text-sm text-gray-500 font-medium">
-                          {category}
-                        </span>
-                      </div>
-                      <div className="text-sm text-gray-700 space-y-1">
-                        <div className="flex justify-between">
-                          <span className="font-medium">הזמנה:</span>
-                          <span>#{task.orderNumber}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">ספק:</span>
-                          <span>{task.supplierName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="font-medium">סטטוס:</span>
-                          <span
-                            className={`font-medium ${
-                              task.stage.status === "completed"
-                                ? "text-green-600"
-                                : task.stage.status === "in-progress"
-                                ? "text-blue-600"
-                                : task.stage.status === "pending"
-                                ? "text-yellow-600"
-                                : "text-red-600"
-                            }`}
-                          >
-                            {task.stage.status === "completed" && "הושלם"}
-                            {task.stage.status === "in-progress" && "בתהליך"}
-                            {task.stage.status === "pending" && "ממתין"}
-                            {task.stage.status === "cancelled" && "בוטל"}
-                          </span>
-                        </div>
-                      </div>
+              <div className="flex-1 overflow-y-auto space-y-6">
+                {selectedDay.stageGroups.map((group) => (
+                  <div
+                    key={group.category}
+                    className="border border-gray-200 rounded-lg p-4"
+                  >
+                    <div className="flex items-center mb-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm font-medium ${group.color} mr-3`}
+                      >
+                        {group.displayName}
+                      </span>
+                      <span className="text-gray-600">
+                        ({group.count} הזמנות)
+                      </span>
                     </div>
-                  );
-                })}
+
+                    {/* פירוט תשלומים לפי סוג */}
+                    {group.category === "payments" ? (
+                      <div className="space-y-4">
+                        {Object.entries(
+                          groupPaymentsByType(group.orders as any)
+                        ).map(([type, payments]) => (
+                          <div key={type} className="ml-4">
+                            <div
+                              className={`inline-flex items-center px-3 py-1 rounded-md text-sm font-medium border mb-3 ${
+                                PAYMENT_COLORS[
+                                  type as keyof typeof PAYMENT_COLORS
+                                ]?.color || "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {PAYMENT_COLORS[
+                                type as keyof typeof PAYMENT_COLORS
+                              ]?.name || type}
+                              <span className="ml-2">({payments.length})</span>
+                            </div>
+                            <div className="space-y-2">
+                              {payments.map((payment, idx) => (
+                                <div
+                                  key={idx}
+                                  className="bg-gray-50 rounded p-3 text-sm"
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <div>
+                                      <span className="font-medium">
+                                        הזמנה #{payment.order.orderNumber}
+                                      </span>
+                                      <span className="text-gray-600 mr-2">
+                                        - {payment.order.supplierName}
+                                      </span>
+                                    </div>
+                                    <span className="font-bold text-green-700">
+                                      {payment.amount?.toLocaleString()}{" "}
+                                      {payment.order.originalCurrency || "USD"}
+                                    </span>
+                                  </div>
+                                  <div className="text-gray-600 mt-1">
+                                    שלב: {payment.stage.name}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      /* שלבים רגילים */
+                      <div className="space-y-2">
+                        {group.orders.map((item, idx) => (
+                          <div
+                            key={idx}
+                            className="bg-gray-50 rounded p-3 text-sm"
+                          >
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <span className="font-medium">
+                                  הזמנה #{item.order.orderNumber}
+                                </span>
+                                <span className="text-gray-600 mr-2">
+                                  - {item.order.supplierName}
+                                </span>
+                              </div>
+                              <span
+                                className={`px-2 py-1 rounded text-xs ${
+                                  item.stage.status === "completed"
+                                    ? "bg-green-100 text-green-800"
+                                    : item.stage.status === "in-progress"
+                                    ? "bg-blue-100 text-blue-800"
+                                    : item.stage.status === "pending"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : "bg-red-100 text-red-800"
+                                }`}
+                              >
+                                {item.stage.status === "completed" && "הושלם"}
+                                {item.stage.status === "in-progress" &&
+                                  "בתהליך"}
+                                {item.stage.status === "pending" && "ממתין"}
+                                {item.stage.status === "cancelled" && "בוטל"}
+                              </span>
+                            </div>
+                            <div className="text-gray-600 mt-1">
+                              שלב: {item.stage.name}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           </div>
         )}
-        {/* Legend */}
+
+        {/* 🆕 4. מקרא דינמי מהשלבים */}
         <div className="mt-8 bg-white rounded-lg shadow-md p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            מקרא צבעים
+            מקרא שלבים
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-green-500 rounded"></div>
-              <span className="text-sm">כספים</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-orange-500 rounded"></div>
-              <span className="text-sm">ייצור</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-blue-500 rounded"></div>
-              <span className="text-sm">שילוח ונמל</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-4 h-4 bg-purple-500 rounded"></div>
-              <span className="text-sm">אישורים ואחרים</span>
-            </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {allStageNames.sort().map((stageName, index) => {
+              const stageConfig = stageConfigs.find(
+                (config) => config.name === stageName
+              );
+              return (
+                <div key={stageName} className="flex items-center gap-2">
+                  <div
+                    className={`w-4 h-4 rounded`}
+                    style={{
+                      backgroundColor: getStageColor(index),
+                    }}
+                  ></div>
+                  <span className="text-sm">
+                    {stageConfig?.emoji || "📋"} {stageName}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
     </div>
   );
+}
+
+// 🆕 3. פונקציה לצבעים שונים לכל שלב
+function getStageColor(index: number): string {
+  const colors = [
+    "#fbbf24", // צהוב - הכנת הזמנה
+    "#3b82f6", // כחול - שליחת הזמנה לספק
+    "#10b981", // ירוק - תשלום מקדמה
+    "#f97316", // כתום - ייצור
+    "#8b5cf6", // סגול - המכלה
+    "#06b6d4", // ציאן - שילוח
+    "#22c55e", // ירוק כהה - תשלום סופי
+    "#6366f1", // אינדיגו - כניסה לנמל ושחרור
+  ];
+
+  return colors[index % colors.length];
 }

@@ -48,6 +48,82 @@ export async function GET() {
   }
 }
 
+// 🆕 פונקציה ליצירת שלבים אוטומטית
+async function createOrderPhases(order: any) {
+  try {
+    const templates = await prisma.orderStageTemplate.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+
+    const etaDate = new Date(order.etaFinal); // תאריך הגעה רצוי
+
+    // חישוב משך כולל של כל השלבים
+    let totalDurationDays = 0;
+    const processedTemplates = [];
+
+    for (const template of templates) {
+      // בדיקת תנאים
+      if (template.isConditional) {
+        if (
+          template.condition === "hasAdvancePayment" &&
+          !order.supplier.hasAdvancePayment
+        ) {
+          continue;
+        }
+      }
+
+      // חישוב משך השלב
+      let durationDays = template.durationDays;
+
+      if (template.isDynamic && template.calculationMethod) {
+        if (template.calculationMethod === "productionTimeWeeks * 7") {
+          durationDays = (order.supplier.productionTimeWeeks || 4) * 7;
+        } else if (template.calculationMethod === "shippingTimeWeeks * 7") {
+          durationDays = (order.supplier.shippingTimeWeeks || 2) * 7;
+        }
+      }
+
+      processedTemplates.push({ ...template, durationDays });
+      totalDurationDays += durationDays;
+    }
+
+    // תאריך התחלה = ETA פחות כל המשך
+    let currentDate = new Date(etaDate);
+    currentDate.setDate(currentDate.getDate() - totalDurationDays);
+
+    // יצירת השלבים
+    for (const template of processedTemplates) {
+      const startDate = new Date(currentDate);
+      const endDate = new Date(currentDate);
+      endDate.setDate(endDate.getDate() + template.durationDays);
+
+      await prisma.orderPhase.create({
+        data: {
+          orderId: order.id,
+          phaseName: template.name,
+          startDate: startDate,
+          endDate: endDate,
+          durationDays: template.durationDays,
+          phaseOrder: template.order,
+          templateId: template.id,
+        },
+      });
+
+      currentDate = new Date(endDate);
+    }
+
+    console.log(
+      `✅ Created phases for order ${order.orderNumber} ending at ${
+        etaDate.toISOString().split("T")[0]
+      }`
+    );
+  } catch (error) {
+    console.error("Error creating order phases:", error);
+    throw error;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
@@ -81,10 +157,16 @@ export async function POST(request: NextRequest) {
           select: {
             name: true,
             currency: true,
+            productionTimeWeeks: true,
+            shippingTimeWeeks: true,
+            hasAdvancePayment: true,
           },
         },
       },
     });
+
+    // 🆕 יצירת שלבים אוטומטית
+    await createOrderPhases(newOrder);
 
     const formattedOrder = {
       ...newOrder,

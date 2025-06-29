@@ -124,6 +124,23 @@ export async function PUT(
 
     console.log("✅ Supplier updated successfully");
 
+    // 🆕 בדיקה אם השתנו זמני ייצור או שילוח
+    const productionTimeChanged =
+      existingSupplier.productionTimeWeeks !== (data.productionTimeWeeks || 1);
+    const shippingTimeChanged =
+      existingSupplier.shippingTimeWeeks !== (data.shippingTimeWeeks || 1);
+
+    if (productionTimeChanged || shippingTimeChanged) {
+      console.log(
+        "⏰ Production/shipping times changed - updating related orders"
+      );
+      await updateRelatedOrders(id, {
+        productionTimeWeeks: data.productionTimeWeeks || 1,
+        shippingTimeWeeks: data.shippingTimeWeeks || 1,
+        hasAdvancePayment: data.hasAdvancePayment || false,
+      });
+    }
+
     // עדכון קטגוריות (אם הן נשלחו)
     if (data.categoryIds && Array.isArray(data.categoryIds)) {
       console.log("🏷️ Updating categories:", data.categoryIds);
@@ -228,5 +245,133 @@ export async function DELETE(
       { error: "שגיאה במחיקת ספק: " + errorMessage },
       { status: 500 }
     );
+  }
+}
+
+// 🆕 פונקציה לעדכון הזמנות קשורות כשמשנים זמני ספק
+async function updateRelatedOrders(
+  supplierId: string,
+  supplierData: {
+    productionTimeWeeks: number;
+    shippingTimeWeeks: number;
+    hasAdvancePayment: boolean;
+  }
+) {
+  try {
+    // מצא הזמנות פעילות של הספק (לא הושלם/מבוטל)
+    const activeOrders = await prisma.order.findMany({
+      where: {
+        supplierId: supplierId,
+        status: {
+          notIn: ["הושלם", "מבוטלת"],
+        },
+      },
+      include: {
+        phases: {
+          orderBy: { phaseOrder: "asc" },
+        },
+      },
+    });
+
+    console.log(`📋 Found ${activeOrders.length} active orders to update`);
+
+    for (const order of activeOrders) {
+      await recalculateOrderPhases(order, supplierData);
+    }
+
+    console.log("✅ All related orders updated successfully");
+  } catch (error) {
+    console.error("❌ Error updating related orders:", error);
+    throw error;
+  }
+}
+
+// 🆕 פונקציה לחישוב מחדש של שלבי הזמנה
+async function recalculateOrderPhases(
+  order: any,
+  supplierData: {
+    productionTimeWeeks: number;
+    shippingTimeWeeks: number;
+    hasAdvancePayment: boolean;
+  }
+) {
+  try {
+    console.log(`🔄 Recalculating phases for order ${order.orderNumber}`);
+
+    // קבלת תבניות השלבים הפעילים
+    const templates = await prisma.orderStageTemplate.findMany({
+      where: { isActive: true },
+      orderBy: { order: "asc" },
+    });
+
+    const etaDate = new Date(order.etaFinal);
+
+    // חישוב משך כולל של כל השלבים עם הזמנים החדשים
+    let totalDurationDays = 0;
+    const processedTemplates = [];
+
+    for (const template of templates) {
+      // בדיקת תנאים
+      if (template.isConditional) {
+        if (
+          template.condition === "hasAdvancePayment" &&
+          !supplierData.hasAdvancePayment
+        ) {
+          continue;
+        }
+      }
+
+      // חישוב משך השלב עם הזמנים החדשים
+      let durationDays = template.durationDays;
+
+      if (template.isDynamic && template.calculationMethod) {
+        if (template.calculationMethod === "productionTimeWeeks * 7") {
+          durationDays = supplierData.productionTimeWeeks * 7;
+        } else if (template.calculationMethod === "shippingTimeWeeks * 7") {
+          durationDays = supplierData.shippingTimeWeeks * 7;
+        }
+      }
+
+      processedTemplates.push({ ...template, durationDays });
+      totalDurationDays += durationDays;
+    }
+
+    // מחיקת השלבים הישנים
+    await prisma.orderPhase.deleteMany({
+      where: { orderId: order.id },
+    });
+
+    // תאריך התחלה = ETA פחות כל המשך
+    let currentDate = new Date(etaDate);
+    currentDate.setDate(currentDate.getDate() - totalDurationDays);
+
+    // יצירת השלבים החדשים
+    for (const template of processedTemplates) {
+      const startDate = new Date(currentDate);
+      const endDate = new Date(currentDate);
+      endDate.setDate(endDate.getDate() + template.durationDays);
+
+      await prisma.orderPhase.create({
+        data: {
+          orderId: order.id,
+          phaseName: template.name,
+          startDate: startDate,
+          endDate: endDate,
+          durationDays: template.durationDays,
+          phaseOrder: template.order,
+          templateId: template.id,
+        },
+      });
+
+      currentDate = new Date(endDate);
+    }
+
+    console.log(`✅ Updated phases for order ${order.orderNumber}`);
+  } catch (error) {
+    console.error(
+      `❌ Error recalculating phases for order ${order.orderNumber}:`,
+      error
+    );
+    throw error;
   }
 }
