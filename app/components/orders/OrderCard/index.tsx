@@ -30,6 +30,19 @@ interface OrderCardProps {
   onViewGantt: (orderId: string) => void;
 }
 
+interface OrderCardProps {
+  order: Order;
+  rowIndex: number;
+  openOrder: { id: string; type: "details" | "files"; row: number } | null;
+  setOpenOrder: (
+    value: { id: string; type: "details" | "files"; row: number } | null
+  ) => void;
+  onEdit: (order: Order) => void;
+  onDelete: (orderId: string) => Promise<void>;
+  onViewGantt: (orderId: string) => void;
+  onStatusUpdate?: (orderId: string, newStatus: string) => void; // 🆕 הוסף זה
+}
+
 export default function OrderCard({
   order,
   rowIndex,
@@ -38,6 +51,7 @@ export default function OrderCard({
   onEdit,
   onDelete,
   onViewGantt,
+  onStatusUpdate,
 }: OrderCardProps) {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -125,7 +139,6 @@ export default function OrderCard({
       // סטטוסים ברירת מחדל במקרה של שגיאה
       setAvailableStatuses([
         "בתהליך הזמנה",
-        "בייצור",
         "נשלח",
         "בדרך",
         "הגיע לנמל",
@@ -137,9 +150,18 @@ export default function OrderCard({
 
   // 🔄 פונקציה לעדכון סטטוס
   const updateOrderStatus = async (newStatus: string) => {
-    if (newStatus === currentStatus) return;
+    console.log("🔄 OrderCard - updateOrderStatus called with:", newStatus);
+    console.log("📋 Order ID:", order.id);
+    console.log("📋 Current status:", currentStatus);
+
+    if (newStatus === currentStatus) {
+      console.log("⚠️ New status same as current - no update needed");
+      return;
+    }
 
     setIsUpdatingStatus(true);
+    console.log("📡 Sending status update request...");
+
     try {
       const response = await fetch(`/api/orders/${order.id}/status`, {
         method: "PUT",
@@ -147,23 +169,34 @@ export default function OrderCard({
         body: JSON.stringify({ status: newStatus }),
       });
 
+      console.log("📨 Response status:", response.status);
+
       if (response.ok) {
+        console.log("✅ Status updated successfully");
+
         setCurrentStatus(newStatus);
         // עדכון האובייקט המקומי
         order.status = newStatus;
+
+        // 🔧 עדכן את הרכיב האב!
+        if (onStatusUpdate) {
+          console.log("🔄 Calling parent onStatusUpdate");
+          onStatusUpdate(order.id, newStatus);
+        } else {
+          console.log("⚠️ No onStatusUpdate callback provided");
+        }
       } else {
-        console.error("Failed to update status");
+        console.error("❌ Failed to update status");
         // החזרת הסטטוס הקודם במקרה של שגיאה
         setCurrentStatus(order.status);
       }
     } catch (error) {
-      console.error("Error updating status:", error);
+      console.error("💥 Error updating status:", error);
       setCurrentStatus(order.status);
     } finally {
       setIsUpdatingStatus(false);
     }
   };
-
   const handleDelete = async () => {
     setShowDeleteConfirm(false);
     await onDelete(order.id);
@@ -220,7 +253,7 @@ export default function OrderCard({
             <div className="mb-2">
               <div className="flex items-center space-x-2 lg:space-x-3 mb-2">
                 <h3 className="text-base lg:text-lg font-semibold text-gray-900 truncate">
-                  {order.orderNumber}
+                  {order.supplierName || "ספק לא צוין"}
                 </h3>
 
                 {/* 🆕 Dropdown לעדכון סטטוס - Responsive */}
@@ -267,14 +300,16 @@ export default function OrderCard({
               <div className="flex items-center space-x-2">
                 <Package className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400 flex-shrink-0" />
                 <span className="truncate">
-                  ספק: {order.supplierName || "לא צוין"}
+                  מספר הזמנה: {order.orderNumber}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
                 <Calendar className="h-3 w-3 lg:h-4 lg:w-4 text-gray-400 flex-shrink-0" />
                 <span className="truncate">
-                  תאריך הגעה רצוי:{" "}
-                  {new Date(order.etaFinal).toLocaleDateString("he-IL")}
+                  זמן הגעה משוער:{" "}
+                  {order.actualEta
+                    ? new Date(order.actualEta).toLocaleDateString("he-IL")
+                    : new Date(order.etaFinal).toLocaleDateString("he-IL")}
                 </span>
               </div>
               <div className="flex items-center space-x-2">
@@ -338,7 +373,7 @@ export default function OrderCard({
                 </span>
               </div>
             )}
-            {order.advanceAmount && Number(order.advanceAmount) > 0 && (
+            {order.advanceAmount && Number(order.advanceAmount) > 0 ? (
               <span className="inline-flex items-center px-2 lg:px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex-shrink-0">
                 מקדמה:{" "}
                 {formatCurrency(
@@ -346,7 +381,7 @@ export default function OrderCard({
                   order.originalCurrency
                 )}
               </span>
-            )}
+            ) : null}
           </div>
 
           <button

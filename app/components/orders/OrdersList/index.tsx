@@ -28,35 +28,55 @@ export default function OrdersList({
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingOrder, setEditingOrder] = useState<Order | null>(null);
+  const [customsCompanies, setCustomsCompanies] = useState([]);
+  const [customsAgents, setCustomsAgents] = useState([]);
 
-  // 🆕 State משותף לניהול פתיחה/סגירה של כרטיסי הזמנות (כמו SupplierCard)
+  // State משותף לניהול פתיחה/סגירה של כרטיסי הזמנות
   const [openOrder, setOpenOrder] = useState<{
     id: string;
     type: "details" | "files";
     row: number;
   } | null>(null);
 
-  // 🆕 תיבת סימון להצגת הושלם/מבוטלת
+  // תיבת סימון להצגת הושלם/מבוטלת
   const [showCompletedCancelled, setShowCompletedCancelled] = useState(false);
 
-  // 🆕 סינון מתקדם עם תיבות סימון לסטטוסים
-  const [selectedStatuses, setSelectedStatuses] = useState<Set<string>>(
-    new Set()
-  );
-  const [isStatusFilterExpanded, setIsStatusFilterExpanded] = useState(false);
+  // תיבת סימון למיון הפוך
+  const [reverseDateSort, setReverseDateSort] = useState(false);
+
+  // 🆕 סינון סטטוס פשוט
+  const [selectedStatusFilter, setSelectedStatusFilter] =
+    useState<string>("all");
 
   // עדכון כשהProps משתנות
   useEffect(() => {
     setOrders(initialOrders);
-
-    // 🆕 אתחול ברירת מחדל לסטטוסים (הכל חוץ מהושלם ומבוטלת)
-    const defaultStatuses = new Set(
-      Array.from(new Set(initialOrders.map((order) => order.status))).filter(
-        (status) => status !== "הושלם" && status !== "מבוטלת"
-      )
-    );
-    setSelectedStatuses(defaultStatuses);
   }, [initialOrders]);
+
+  useEffect(() => {
+    const loadCustomsData = async () => {
+      try {
+        const [companiesRes, agentsRes] = await Promise.all([
+          fetch("/api/customs/companies"),
+          fetch("/api/customs/agents"),
+        ]);
+
+        if (companiesRes.ok) {
+          const companies = await companiesRes.json();
+          setCustomsCompanies(companies);
+        }
+
+        if (agentsRes.ok) {
+          const agents = await agentsRes.json();
+          setCustomsAgents(agents);
+        }
+      } catch (error) {
+        console.error("Error loading customs data:", error);
+      }
+    };
+
+    loadCustomsData();
+  }, []);
 
   const fetchOrders = async () => {
     try {
@@ -97,7 +117,7 @@ export default function OrdersList({
       }
 
       console.log("✅ Order added successfully");
-      await fetchOrders(); // רענן את הרשימה
+      await fetchOrders();
       setShowAddModal(false);
     } catch (error: any) {
       console.error("Error adding order:", error);
@@ -132,7 +152,7 @@ export default function OrdersList({
       }
 
       console.log("✅ Order updated successfully");
-      await fetchOrders(); // רענן את הרשימה
+      await fetchOrders();
       setShowEditModal(false);
       setEditingOrder(null);
     } catch (error: any) {
@@ -163,7 +183,7 @@ export default function OrdersList({
       }
 
       console.log("✅ Order deleted successfully");
-      await fetchOrders(); // רענן את הרשימה
+      await fetchOrders();
     } catch (error: any) {
       console.error("Error deleting order:", error);
       alert("שגיאה במחיקת הזמנה: " + (error?.message || "שגיאה לא ידועה"));
@@ -179,77 +199,84 @@ export default function OrdersList({
     }
   };
 
-  // 🆕 פונקציות לטיפול בסינון סטטוסים
-  const handleStatusToggle = (status: string) => {
-    const newStatuses = new Set(selectedStatuses);
-    if (newStatuses.has(status)) {
-      newStatuses.delete(status);
-    } else {
-      newStatuses.add(status);
-    }
-    setSelectedStatuses(newStatuses);
-  };
+  // סינון הזמנות מעודכן עם מיון
+  const filteredOrders = orders
+    .filter((order) => {
+      const matchesSearch =
+        order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        order.containerNumber?.toLowerCase().includes(searchTerm.toLowerCase());
 
-  const handleSelectAllStatuses = () => {
-    const allStatuses = new Set(orders.map((order) => order.status));
-    setSelectedStatuses(allStatuses);
-  };
+      const matchesSupplier =
+        !supplierFilter || order.supplierName === supplierFilter;
 
-  const handleClearAllStatuses = () => {
-    setSelectedStatuses(new Set());
-  };
+      // לוגיקת הצגת הושלם/מבוטלת
+      const isCompletedOrCancelled =
+        order.status === "הושלם" || order.status === "מבוטלת";
 
-  const handleResetToDefault = () => {
-    const defaultStatuses = new Set(
-      Array.from(new Set(orders.map((order) => order.status))).filter(
-        (status) => status !== "הושלם" && status !== "מבוטלת"
-      )
-    );
-    setSelectedStatuses(defaultStatuses);
-  };
+      if (isCompletedOrCancelled && !showCompletedCancelled) {
+        return false;
+      }
 
-  // 🆕 סינון הזמנות מעודכן
-  const filteredOrders = orders.filter((order) => {
-    const matchesSearch =
-      order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.notes?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      order.containerNumber?.toLowerCase().includes(searchTerm.toLowerCase());
+      // 🆕 סינון לפי סטטוס נבחר
+      const matchesStatus =
+        selectedStatusFilter === "all" || order.status === selectedStatusFilter;
 
-    const matchesSupplier =
-      !supplierFilter || order.supplierId === supplierFilter;
+      return matchesSearch && matchesSupplier && matchesStatus;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.actualEta || a.etaFinal);
+      const dateB = new Date(b.actualEta || b.etaFinal);
+      const sortOrder = reverseDateSort
+        ? dateB.getTime() - dateA.getTime()
+        : dateA.getTime() - dateB.getTime();
+      return sortOrder;
+    });
 
-    // 🆕 לוגיקת הצגת הושלם/מבוטלת
+  // עדכן את יצירת הרשימה:
+  const uniqueSuppliers = Array.from(
+    new Set(
+      orders
+        .filter((order) => {
+          // בדוק שיש שם ספק
+          if (!order.supplierName || order.supplierName.trim() === "") {
+            return false;
+          }
+
+          // אם זה הושלם או מבוטלת, הצג רק אם התיבה מסומנת
+          const isCompletedOrCancelled =
+            order.status === "הושלם" || order.status === "מבוטלת";
+
+          if (isCompletedOrCancelled) {
+            return showCompletedCancelled;
+          }
+
+          return true;
+        })
+        .map((order) => order.supplierName)
+    )
+  ).sort(); // ממיין אלפבתית
+
+  // ספירת הזמנות לפי סטטוס
+  const statusCounts: { [key: string]: number } = {};
+  orders.forEach((order) => {
+    // אם זה הושלם או מבוטלת, ספור רק אם התיבה מסומנת
     const isCompletedOrCancelled =
       order.status === "הושלם" || order.status === "מבוטלת";
 
-    // אם הזמנה היא הושלם/מבוטלת - הצג רק אם התיבה מסומנת
-    if (isCompletedOrCancelled) {
-      return showCompletedCancelled && matchesSearch && matchesSupplier;
+    if (isCompletedOrCancelled && !showCompletedCancelled) {
+      return; // דלג על ההזמנה הזו
     }
 
-    // 🆕 סינון לפי סטטוסים נבחרים (רק להזמנות שאינן הושלם/מבוטלת)
-    const matchesStatus = selectedStatuses.has(order.status);
-
-    return matchesSearch && matchesSupplier && matchesStatus;
-  });
-
-  // רשימת סטטוסים ייחודיים (ללא הושלם ומבוטלת לסינון)
-  const uniqueStatuses = Array.from(
-    new Set(orders.map((order) => order.status))
-  )
-    .filter((status) => status !== "הושלם" && status !== "מבוטלת")
-    .sort();
-
-  const uniqueSuppliers = Array.from(
-    new Set(orders.map((order) => order.supplierName))
-  );
-
-  // 🆕 ספירת הזמנות לפי סטטוס
-  const statusCounts: { [key: string]: number } = {};
-  orders.forEach((order) => {
     statusCounts[order.status] = (statusCounts[order.status] || 0) + 1;
   });
+
+  // חשב סך הכל הזמנות שמוצגות
+  const totalVisibleOrders = Object.values(statusCounts).reduce(
+    (sum, count) => sum + count,
+    0
+  );
 
   if (loading) {
     return (
@@ -288,11 +315,27 @@ export default function OrdersList({
       </div>
     );
   }
+  const handleStatusUpdate = async (orderId: string, newStatus: string) => {
+    console.log("🎯 OrdersList - handleStatusUpdate called:", {
+      orderId,
+      newStatus,
+    });
+
+    // עדכן את ההזמנה ברשימה המקומית
+    const updatedOrders = orders.map((order) =>
+      order.id === orderId ? { ...order, status: newStatus } : order
+    );
+
+    setOrders(updatedOrders);
+    onUpdateOrders(updatedOrders); // עדכן את הרכיב האב (KPI)
+
+    console.log("✅ Orders list updated");
+  };
 
   return (
     <div>
-      {/* כותרת וכפתור הוספה */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6">
+      {/* כותרת, חיפוש, סינונים וכפתור הוספה - בשורה אחת */}
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-0 gap-4">
         <div>
           <h2 className="text-xl font-semibold text-gray-900 mb-1">
             רשימת הזמנות
@@ -301,153 +344,136 @@ export default function OrdersList({
             {orders.length} הזמנות במערכת ({filteredOrders.length} מוצגות)
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="mt-3 lg:mt-0 inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
-          <Plus className="h-4 w-4 ml-2" />
-          הוסף הזמנה חדשה
-        </button>
-      </div>
 
-      {/* סינונים וחיפוש */}
-      <div className="mb-6 space-y-4">
-        {/* שדה חיפוש */}
-        <div className="relative">
-          <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-            <Search className="h-4 w-4 text-gray-400" />
+        {/* אזור מרכזי - חיפוש וסינונים */}
+        <div className="flex flex-col lg:flex-row items-start lg:items-center gap-3 flex-1 max-w-4xl">
+          {/* שדה חיפוש */}
+          <div className="relative w-full lg:w-64">
+            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              <Search className="h-4 w-4 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              placeholder="חפש הזמנות..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="block w-full pr-10 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
+            />
           </div>
-          <input
-            type="text"
-            placeholder="חפש הזמנות (מספר הזמנה, ספק, הערות, מכולה...)"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pr-10 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 text-sm"
-          />
+          {/* סינון ספק */}
+          <select
+            value={supplierFilter}
+            onChange={(e) => setSupplierFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-blue-500 focus:border-blue-500 min-w-0"
+          >
+            <option value="">כל הספקים</option>
+            {uniqueSuppliers.map((supplier) => (
+              <option key={supplier} value={supplier}>
+                {supplier}
+              </option>
+            ))}
+          </select>
+          {/* תיבות סימון */}
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <label className="flex items-center space-x-2 text-base whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={showCompletedCancelled}
+                onChange={(e) => setShowCompletedCancelled(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-gray-700">הצג הושלם ומבוטלת</span>
+              {showCompletedCancelled ? (
+                <Eye className="h-4 w-4 text-green-600" />
+              ) : (
+                <EyeOff className="h-4 w-4 text-gray-400" />
+              )}
+            </label>
+
+            <label className="flex items-center space-x-2 text-base whitespace-nowrap">
+              <input
+                type="checkbox"
+                checked={reverseDateSort}
+                onChange={(e) => setReverseDateSort(e.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <span className="text-gray-700">
+                {reverseDateSort ? "מיון: רחוק←קרוב" : "מיון: קרוב←רחוק"}
+              </span>
+            </label>
+          </div>
         </div>
 
-        {/* שורת בקרים */}
-        <div className="flex flex-wrap gap-4 items-center">
-          {/* 🆕 תיבת סימון להצגת הושלם/מבוטלת */}
-          <label className="flex items-center space-x-2 text-sm">
-            <input
-              type="checkbox"
-              checked={showCompletedCancelled}
-              onChange={(e) => setShowCompletedCancelled(e.target.checked)}
-              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-gray-700">הצג הושלם ומבוטלת</span>
-            {showCompletedCancelled ? (
-              <Eye className="h-4 w-4 text-green-600" />
-            ) : (
-              <EyeOff className="h-4 w-4 text-gray-400" />
-            )}
-          </label>
-
-          {/* סינון ספק */}
-          <div>
-            <select
-              value={supplierFilter}
-              onChange={(e) => setSupplierFilter(e.target.value)}
-              className="border border-gray-300 rounded-md px-3 py-1 text-sm focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="">כל הספקים</option>
-              {uniqueSuppliers.map((supplier) => (
-                <option key={supplier} value={supplier}>
-                  {supplier}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* 🆕 כפתור סינון סטטוסים */}
-          <button
-            onClick={() => setIsStatusFilterExpanded(!isStatusFilterExpanded)}
-            className="flex items-center space-x-2 px-3 py-1 border border-gray-300 rounded-md hover:bg-gray-50 text-sm"
-          >
-            <Filter className="h-4 w-4" />
-            <span>סינון סטטוסים ({selectedStatuses.size})</span>
-          </button>
-
-          {/* כפתור ניקוי סינונים */}
-          {(supplierFilter ||
-            searchTerm ||
-            selectedStatuses.size !== uniqueStatuses.length) && (
+        {/* כפתורי פעולה */}
+        <div className="flex items-center gap-3">
+          {(supplierFilter || searchTerm || selectedStatusFilter !== "all") && (
             <button
               onClick={() => {
                 setSupplierFilter("");
                 setSearchTerm("");
-                handleResetToDefault();
+                setSelectedStatusFilter("all");
               }}
-              className="text-sm text-blue-600 hover:text-blue-700"
+              className="text-sm text-blue-600 hover:text-blue-700 px-3 py-2 rounded-md hover:bg-blue-50 transition-colors"
             >
               נקה סינונים
             </button>
           )}
+
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors flex-shrink-0"
+          >
+            <Plus className="h-4 w-4 ml-2" />
+            הוסף הזמנה חדשה
+          </button>
         </div>
+      </div>
 
-        {/* 🆕 תיבות סימון לסטטוסים */}
-        {isStatusFilterExpanded && (
-          <div className="bg-gray-50 p-4 rounded-lg border">
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-sm font-medium text-gray-900">
-                בחר סטטוסים להצגה:
-              </h4>
-              <div className="flex space-x-2 text-xs">
-                <button
-                  onClick={handleSelectAllStatuses}
-                  className="text-blue-600 hover:text-blue-700"
-                >
-                  בחר הכל
-                </button>
-                <span className="text-gray-400">|</span>
-                <button
-                  onClick={handleClearAllStatuses}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  בטל הכל
-                </button>
-                <span className="text-gray-400">|</span>
-                <button
-                  onClick={handleResetToDefault}
-                  className="text-green-600 hover:text-green-700"
-                >
-                  ברירת מחדל
-                </button>
-              </div>
-            </div>
+      {/* סטטוסים עם כותרת וכפתורים באותה שורה */}
+      <div className="mb-4">
+        <div className="bg-white p-4 rounded-lg shadow-md">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            {/* כותרת */}
+            <h3 className="text-lg font-semibold text-gray-900 flex-shrink-0">
+              סינון לפי סטטוס
+            </h3>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-              {uniqueStatuses.map((status) => (
-                <label
-                  key={status}
-                  className={`flex items-center space-x-2 p-2 rounded border cursor-pointer transition-colors ${
-                    selectedStatuses.has(status)
-                      ? "bg-blue-50 border-blue-200"
-                      : "bg-white border-gray-200 hover:bg-gray-50"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedStatuses.has(status)}
-                    onChange={() => handleStatusToggle(status)}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-sm text-gray-700 flex-1">{status}</span>
-                  <span
-                    className={`text-xs px-2 py-1 rounded ${
-                      selectedStatuses.has(status)
-                        ? "bg-blue-100 text-blue-800"
-                        : "bg-gray-100 text-gray-600"
+            {/* כפתורי הסטטוסים */}
+            <div className="flex flex-wrap gap-2 flex-1">
+              <button
+                onClick={() => setSelectedStatusFilter("all")}
+                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  selectedStatusFilter === "all"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                }`}
+              >
+                הכל ({totalVisibleOrders})
+              </button>
+
+              {Object.entries(statusCounts)
+                .filter(([status]) => {
+                  if (status === "הושלם" || status === "מבוטלת") {
+                    return showCompletedCancelled;
+                  }
+                  return true;
+                })
+                .map(([status, count]) => (
+                  <button
+                    key={status}
+                    onClick={() => setSelectedStatusFilter(status)}
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      selectedStatusFilter === status
+                        ? "bg-blue-600 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                     }`}
                   >
-                    {statusCounts[status] || 0}
-                  </span>
-                </label>
-              ))}
+                    {status} ({count})
+                  </button>
+                ))}
             </div>
           </div>
-        )}
+        </div>
       </div>
 
       {/* רשימת הזמנות */}
@@ -467,30 +493,24 @@ export default function OrdersList({
             />
           </svg>
           <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {searchTerm ||
-            supplierFilter ||
-            selectedStatuses.size < uniqueStatuses.length
+            {searchTerm || supplierFilter || selectedStatusFilter !== "all"
               ? "לא נמצאו הזמנות"
               : "אין הזמנות במערכת"}
           </h3>
           <p className="text-gray-600 mb-4">
-            {searchTerm ||
-            supplierFilter ||
-            selectedStatuses.size < uniqueStatuses.length
+            {searchTerm || supplierFilter || selectedStatusFilter !== "all"
               ? "לא נמצאו הזמנות התואמות לסינונים שנבחרו"
               : "התחל בהוספת הזמנה ראשונה למערכת"}
           </p>
-          {!searchTerm &&
-            !supplierFilter &&
-            selectedStatuses.size === uniqueStatuses.length && (
-              <button
-                onClick={() => setShowAddModal(true)}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
-              >
-                <Plus className="h-4 w-4 ml-2" />
-                הוסף הזמנה ראשונה
-              </button>
-            )}
+          {!searchTerm && !supplierFilter && selectedStatusFilter === "all" && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors"
+            >
+              <Plus className="h-4 w-4 ml-2" />
+              הוסף הזמנה ראשונה
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -504,6 +524,7 @@ export default function OrdersList({
               onEdit={handleEditOrder}
               onDelete={handleDeleteOrder}
               onViewGantt={handleViewGantt}
+              onStatusUpdate={handleStatusUpdate}
             />
           ))}
         </div>
@@ -530,6 +551,8 @@ export default function OrdersList({
           onUpdateOrder={handleUpdateOrder}
           order={editingOrder}
           suppliers={suppliers}
+          customsCompanies={customsCompanies}
+          customsAgents={customsAgents}
         />
       )}
     </div>

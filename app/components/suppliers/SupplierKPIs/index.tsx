@@ -76,17 +76,13 @@ export default function SupplierKPIs() {
       }
       const ordersData = await ordersResponse.json();
 
-      // 🔧 תיקון: וודא שאנחנו עובדים על המערכים הנכונים
+      // 🔧 וודא שאנחנו עובדים על המערכים הנכונים
       const suppliers = Array.isArray(suppliersData)
         ? suppliersData
         : suppliersData.suppliers || [];
       const orders = Array.isArray(ordersData)
         ? ordersData
         : ordersData.orders || [];
-
-      console.log("✅ Suppliers count:", suppliers.length);
-      console.log("✅ Orders count:", orders.length);
-      console.log("✅ Sample supplier:", suppliers[0]);
 
       // חישוב KPIs
       const totalSuppliers = suppliers.length;
@@ -103,7 +99,7 @@ export default function SupplierKPIs() {
       );
       const suppliersWithActiveOrders = activeSupplierIds.size;
 
-      // 🔧 תיקון: ממוצע מקדמה
+      // 🔧 ממוצע מקדמה
       const suppliersWithAdvance = suppliers.filter((s: any) => {
         const hasAdvance = s.hasAdvancePayment === true;
         console.log(
@@ -120,7 +116,7 @@ export default function SupplierKPIs() {
             }, 0) / suppliersWithAdvance.length
           : 0;
 
-      // 🔧 תיקון: ממוצע זמן ייצור
+      // 🔧 ממוצע זמן ייצור
       const validProductionTimes = suppliers
         .map((s: any) => Number(s.productionTimeWeeks) || 0)
         .filter((time: number) => time > 0);
@@ -133,7 +129,7 @@ export default function SupplierKPIs() {
             ) / validProductionTimes.length
           : 0;
 
-      // 🔧 תיקון: ממוצע זמן שילוח
+      // 🔧 ממוצע זמן שילוח
       const validShippingTimes = suppliers
         .map((s: any) => Number(s.shippingTimeWeeks) || 0)
         .filter((time: number) => time > 0);
@@ -221,18 +217,6 @@ export default function SupplierKPIs() {
   if (isLoading) {
     return (
       <div>
-        {/* כפתור רענון במצב טעינה */}
-        <div className="flex justify-between items-center mb-0">
-          <h3 className="text-lg font-semibold text-gray-900">מדדי ספקים</h3>
-          <button
-            disabled
-            className="flex items-center space-x-2 px-3 py-1 text-sm bg-gray-400 text-white rounded cursor-not-allowed"
-          >
-            <span>טוען...</span>
-            <span>⏳</span>
-          </button>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {Array(5)
             .fill(0)
@@ -252,38 +236,26 @@ export default function SupplierKPIs() {
 
   return (
     <div>
-      {/* כפתור רענון */}
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-semibold text-gray-900">מדדי ספקים</h3>
-        <button
-          onClick={handleRefresh}
-          disabled={isLoading}
-          className="flex items-center space-x-2 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors"
-        >
-          <span>{isLoading ? "מרענן..." : "רענן"}</span>
-          {!isLoading && <span>🔄</span>}
-        </button>
-      </div>
-
-      {/* הKPI cards */}
+      {/* הKPI cards עם תוכן ממורכז */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         {kpiCards.map((card, index) => (
           <div
             key={index}
-            className={`${card.bgColor} p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow`}
+            className={`${card.bgColor} p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow flex flex-col items-center justify-center text-center min-h-[120px]`}
           >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 mb-2">
-                  {card.title}
-                </p>
-                <p className={`text-2xl font-bold ${card.textColor}`}>
-                  {card.value}
-                  {card.suffix}
-                </p>
-              </div>
-              <div className="text-2xl opacity-80">{card.icon}</div>
-            </div>
+            {/* אייקון למעלה */}
+            <div className="text-2xl opacity-80 mb-2">{card.icon}</div>
+
+            {/* כותרת */}
+            <p className="text-sm font-medium text-gray-600 mb-2 line-clamp-2 leading-tight">
+              {card.title}
+            </p>
+
+            {/* ערך מרכזי */}
+            <p className={`text-2xl font-bold ${card.textColor}`}>
+              {card.value}
+              {card.suffix}
+            </p>
           </div>
         ))}
       </div>

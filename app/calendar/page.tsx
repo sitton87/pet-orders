@@ -38,13 +38,11 @@ export default function CalendarPage() {
 
   // 🆕 1. תיקון - טעינה ראשונית עם החודש הנוכחי
   useEffect(() => {
-    const initializeCalendar = async () => {
-      await fetchOrders();
-      // הקלנדר יתעדכן אוטומטית ב-useEffect האחר כשorders יטענו
-    };
+    if (status === "loading") return;
+    if (!session) return;
 
-    initializeCalendar();
-  }, []);
+    fetchOrders();
+  }, [status, session]);
 
   const fetchOrders = async () => {
     try {
@@ -52,7 +50,6 @@ export default function CalendarPage() {
       const response = await fetch("/api/calendar/orders");
       if (response.ok) {
         const data = await response.json();
-        console.log("📅 CALENDAR DEBUG - Orders received:", data);
         setOrders(data);
 
         // טען קונפיגורציית שלבים דינמית
@@ -169,9 +166,9 @@ export default function CalendarPage() {
     <div>
       <Navbar />
 
-      <div className="w-full px-4 py-8 mt-16">
+      <div className="w-full px-4 py-4 mt-16">
         {/* כותרת העמוד */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-gray-900">לוח שנה</h1>
             <div className="h-6 w-px bg-gray-300"></div>

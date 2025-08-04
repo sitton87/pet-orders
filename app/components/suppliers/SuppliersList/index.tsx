@@ -254,10 +254,11 @@ export default function SuppliersList() {
         </div>
       )}
 
-      {/* כותרת וכפתור הוספה - 🆕 Responsive */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 lg:gap-4">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-lg lg:text-xl font-semibold text-gray-900 truncate">
+      {/* כותרת, חיפוש, סינון וכפתור הוספה - בשורה אחת */}
+      <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3 lg:gap-4">
+        {/* כותרת */}
+        <div className="flex-shrink-0">
+          <h2 className="text-lg lg:text-xl font-semibold text-gray-900">
             רשימת ספקים ({stats.totalSuppliers})
           </h2>
           <div className="text-xs lg:text-sm text-gray-600 mt-1 space-y-1">
@@ -273,54 +274,48 @@ export default function SuppliersList() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          <button
-            onClick={refreshSuppliers}
-            disabled={loading}
-            className="flex items-center space-x-2 px-2 lg:px-3 py-1.5 lg:py-2 text-xs lg:text-sm bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors disabled:opacity-50"
-          >
-            <span>{loading ? "מרענן..." : "רענן"}</span>
-            {!loading && <span>🔄</span>}
-          </button>
+        {/* אזור מרכזי - חיפוש וסינון */}
+        <div className="flex flex-col sm:flex-row gap-3 flex-1 max-w-2xl">
+          {/* חיפוש */}
+          <div className="relative flex-1">
+            <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="חיפוש ספקים..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            />
+          </div>
 
+          {/* סינון מדינות */}
+          <div className="flex items-center space-x-2 flex-shrink-0">
+            <Filter className="h-4 w-4 text-gray-400" />
+            <select
+              value={selectedCountry}
+              onChange={(e) => setSelectedCountry(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm min-w-0 w-32"
+            >
+              <option value="">כל המדינות</option>
+              {uniqueCountries.map((country) => (
+                <option key={country} value={country}>
+                  {country}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        {/* כפתור הוספה */}
+        <div className="flex-shrink-0">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center space-x-2 bg-blue-600 text-white px-3 lg:px-4 py-1.5 lg:py-2 rounded-md hover:bg-blue-700 transition-colors text-xs lg:text-sm"
+            className="flex items-center space-x-2 bg-blue-600 text-white px-3 lg:px-4 py-2 rounded-md hover:bg-blue-700 transition-colors text-sm"
           >
-            <Plus className="h-3 w-3 lg:h-4 lg:w-4" />
+            <Plus className="h-4 w-4" />
             <span className="hidden sm:inline">הוסף ספק</span>
             <span className="sm:hidden">הוסף</span>
           </button>
-        </div>
-      </div>
-
-      {/* חיפוש וסינונים - 🆕 Responsive */}
-      <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-        <div className="relative flex-1">
-          <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <input
-            type="text"
-            placeholder="חיפוש לפי שם, מדינה, עיר או אימייל..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pr-10 pl-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base"
-          />
-        </div>
-
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <Filter className="h-4 w-4 text-gray-400" />
-          <select
-            value={selectedCountry}
-            onChange={(e) => setSelectedCountry(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm lg:text-base min-w-0"
-          >
-            <option value="">כל המדינות</option>
-            {uniqueCountries.map((country) => (
-              <option key={country} value={country}>
-                {country}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

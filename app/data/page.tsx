@@ -82,9 +82,9 @@ export default function DataPage() {
     <div className="min-h-screen bg-gray-50">
       <Navbar />
 
-      <div className="w-full px-4 py-8 mt-16">
+      <div className="w-full px-4 py-4 mt-16">
         {/* כותרת העמוד */}
-        <div className="mb-8">
+        <div className="mb-4">
           <div className="flex items-center gap-4">
             <h1 className="text-3xl font-bold text-gray-900">
               ניהול הגדרות ונתונים

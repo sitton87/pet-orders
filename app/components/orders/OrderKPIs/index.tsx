@@ -217,95 +217,40 @@ export default function OrderKPIs({ orders }: OrderKPIsProps) {
 
   return (
     <div className="space-y-6">
-      {/* כפתור רענון */}
-      <div className="flex justify-between items-center">
-        <h2 className="text-xl font-semibold text-gray-900">נתוני מערכת</h2>
-        <button
-          onClick={() => {
-            setIsLoading(true);
-            setTimeout(() => {
-              setKpiData(calculateKPIs());
-              setIsLoading(false);
-            }, 500);
-          }}
-          disabled={isLoading}
-          className={`px-4 py-1 text-white rounded-md transition-colors flex items-center space-x-2 ${
-            isLoading
-              ? "bg-gray-400 cursor-not-allowed"
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          <span>{isLoading ? "טוען..." : "רענן נתונים"}</span>
-          {isLoading ? (
-            <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full"></div>
-          ) : (
-            <svg
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-              />
-            </svg>
-          )}
-        </button>
-      </div>
-
       {/* KPI Cards עליונים */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-4">
         {kpiCards.map((card, index) => (
           <div
             key={index}
-            className={`${card.bgColor} p-3 lg:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow relative group min-w-0`}
+            className={`${card.bgColor} p-3 lg:p-4 rounded-lg shadow-md hover:shadow-lg transition-shadow relative group min-w-0 min-h-[120px] flex flex-col items-center justify-center text-center`}
           >
-            <div className="flex items-center justify-between min-w-0">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs lg:text-sm font-medium text-gray-600 mb-2 truncate">
-                  {card.title}
-                </p>
-                <p
-                  className={`text-sm lg:text-2xl font-bold ${card.textColor} break-words`}
-                >
-                  {typeof card.value === "string"
-                    ? card.value
-                    : `${card.value}${card.suffix}`}
-                </p>
-                {/* תיאור נוסף לKPIs החדשים */}
-                {card.description && (
-                  <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity truncate">
-                    {card.description}
-                  </p>
-                )}
-              </div>
-              <div className="text-lg lg:text-2xl opacity-80 flex-shrink-0 ml-2">
-                {card.icon}
-              </div>
+            {/* אייקון */}
+            <div className="text-lg lg:text-2xl opacity-80 mb-2">
+              {card.icon}
             </div>
+
+            {/* כותרת */}
+            <p className="text-xs lg:text-sm font-medium text-gray-600 mb-2 line-clamp-2 leading-tight">
+              {card.title}
+            </p>
+
+            {/* סכום */}
+            <p
+              className={`text-xs sm:text-sm md:text-base lg:text-lg font-bold ${card.textColor} whitespace-nowrap overflow-hidden text-ellipsis`}
+            >
+              {typeof card.value === "string"
+                ? card.value
+                : `${card.value}${card.suffix}`}
+            </p>
+
+            {/* תיאור נוסף לKPIs החדשים */}
+            {card.description && (
+              <p className="text-xs text-gray-500 mt-1 opacity-0 group-hover:opacity-100 transition-opacity line-clamp-2">
+                {card.description}
+              </p>
+            )}
           </div>
         ))}
-      </div>
-
-      {/* התפלגות לפי סטטוס */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          התפלגות לפי סטטוס
-        </h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          {Object.entries(kpiData.statusBreakdown).map(([status, count]) => (
-            <div
-              key={status}
-              className="text-center p-3 bg-gray-50 rounded-lg min-w-0"
-            >
-              <div className="text-lg font-bold text-gray-900">{count}</div>
-              <div className="text-xs text-gray-600 truncate">{status}</div>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
